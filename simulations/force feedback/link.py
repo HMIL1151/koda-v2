@@ -6,9 +6,9 @@ from constants import *
 class Link():
     def __init__ (self, joint_1: Joint, joint_2: Joint, length: float, angle: Angle | None = None, rate=spring_rate_N_per_mm, id=None):
         self.length = length
-        self.upsteam_joint = joint_1
+        self.upstream_joint = joint_1
         self.downstream_joint = joint_2
-        self.joints = [self.upsteam_joint, self.downstream_joint]
+        self.joints = [self.upstream_joint, self.downstream_joint]
         self.spring_rate = rate
         self.length = length
         self.id = id
@@ -23,8 +23,8 @@ class Link():
 
                 other_joint = Link.get_other_joint(self, joint)
 
-                x = self.length * np.cos(angle.angle_rad) + joint.position.x
-                y = self.length * np.sin(angle.angle_rad) + joint.position.y
+                x = self.length * np.cos(angle.rad) + joint.position.x
+                y = self.length * np.sin(angle.rad) + joint.position.y
                 other_joint.set_position(Coordinate(x, y))
                 self.position_set = True
                 break
@@ -35,20 +35,21 @@ class Link():
             if joint.position is None:
                 return None
             
-        delta_x = self.upsteam_joint.position.x - self.downstream_joint.position.x
-        delta_y = self.upsteam_joint.position.y - self.downstream_joint.position.y
+       
+        delta_x = self.downstream_joint.position.x - self.upstream_joint.position.x
+        delta_y = self.downstream_joint.position.y - self.upstream_joint.position.y
+        angle = Angle.from_radians(np.arctan2(delta_y, delta_x))
 
-        return Angle(np.arctan2(delta_x, delta_y))
+        return angle
     
     def update_direction(self):
         self.direction = self.get_direction()
 
-    def update_length(self, load: Tension):
+    def update_length(self):
         if self.spring_rate is None:
             return
         
-        self.length = self.length + load.tension_N/self.spring_rate
-        print(f"Link: [{self.id}], New Length: {self.length}mm")
+        self.length = self.length + self.load.mag.tension_N/self.spring_rate
     
     def set_load(self, load: Tension):
         self.update_length(load)
@@ -57,4 +58,4 @@ class Link():
 
     @staticmethod
     def get_other_joint(link: Link, given_joint:Joint) -> Joint:
-        return link.upsteam_joint if given_joint == link.downstream_joint else link.downstream_joint
+        return link.upstream_joint if given_joint == link.downstream_joint else link.downstream_joint

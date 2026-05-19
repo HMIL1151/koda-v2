@@ -4,12 +4,14 @@ from math_funcs import *
 import matplotlib.pyplot as plt
 
 class Linkage():
-    def __init__ (self, links: list[Link]):
+    def __init__ (self, links: list[Link], id=None):
         self.input_links = links
-        self.joints = []
-        self.links = []
+        self.joints: list[Joint] = []
+        self.links: list[Link] = []
+        self.id = id
         
         self.populate_linkage()
+        self.foot: Joint = self.joints[2]
         self.solve_forward_kinematics()
         
     
@@ -71,9 +73,15 @@ class Linkage():
             link_tension[0].set_load(link_tension[1])
         self.solve_forward_kinematics()
 
+    def translate(self, translation: Coordinate):
+        for joint in self.joints:
+            joint.position = Coordinate.translate(joint.position, translation)
+    
+    def rotate(self, centre: Coordinate, angle: Angle):
+        for joint in self.joints:
+            joint.position = Coordinate.rotate(joint.position, centre, angle)
        
     def solve_forward_kinematics(self):
-
         for link in self.links:
             if link.driven == True and link.position_set == False:
                 raise ValueError(f"driven link {link.id} angle is not set")
@@ -87,7 +95,7 @@ class Linkage():
         circle1 = Circle(self.joints[1].position, self.links[1].length)
         circle2 = Circle(self.joints[-2].position, self.links[-2].length)
 
-        intersections = intersection_between_circles(circle1, circle2)
+        intersections = Circle.intersection_between_circles(circle1, circle2)
 
         if len(intersections) < 1:
             raise ValueError("No intersections")
@@ -98,6 +106,9 @@ class Linkage():
                 joint_position = intersection
 
         self.joints[2].set_position(joint_position)
+
+        for link in self.links:
+            link.update_direction()
         return
     
     def draw_linkage(self):

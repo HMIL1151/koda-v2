@@ -12,13 +12,16 @@ front_calf = Link(front_knee, foot, calf_length_mm, id="front calf")
 rear_calf = Link(rear_knee, foot, calf_length_mm, id="rear calf")
 
 leg = Linkage([front_thigh, rear_thigh, front_calf, rear_calf])
-leg.set_link_loads((
-    (front_calf, Tension.from_newtons(-10)), 
-    (rear_calf, Tension.from_newtons(5))
-    ))
 
-#leg.draw_linkage()
-force_vectors = foot.get_force_vectors()
-reaction = ForceVector.find_equilibrium_vector(force_vectors)
-print(f"Foot Reaction: Rx = {reaction.x_component}, Ry = {reaction.y_component}")
+robot = Body(Mass.from_kg(3), wheelbase_mm, leg)
+robot.draw_body()
+robot.solve_robot()
+print("new robot")
+robot.draw_body()
+
+
+
+
+
+
 

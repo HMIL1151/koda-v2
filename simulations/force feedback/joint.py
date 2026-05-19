@@ -1,11 +1,16 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
 from units import *
+if TYPE_CHECKING:
+    from link import Link
 
 class Joint():
     def __init__ (self, joint_type=JointType.PASSIVE, position: Coordinate | None = None, id=None):   
         self.position = position
         self.type = joint_type
         self.id = id
-        self.links = []
+        self.links: list[Link] = []
+        self.reaction: ForceVector = None
 
         if self.type == JointType.DRIVEN_STATIC:
             if position is None:
