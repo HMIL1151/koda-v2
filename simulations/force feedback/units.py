@@ -80,6 +80,9 @@ class Circle:
             y4 = y5 - h/distance * dx
             intersection_coords.append(Coordinate(x4, y4))
 
+            if len(intersection_coords) < 1:
+                raise ValueError("No intersections found")
+
         return intersection_coords
 
 class Tension:

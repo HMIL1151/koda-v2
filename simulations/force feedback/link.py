@@ -5,12 +5,12 @@ from constants import *
 
 class Link():
     def __init__ (self, joint_1: Joint, joint_2: Joint, length: float, angle: Angle | None = None, rate=spring_rate_N_per_mm, id=None):
+        self.natural_length = length
         self.length = length
         self.upstream_joint = joint_1
         self.downstream_joint = joint_2
         self.joints = [self.upstream_joint, self.downstream_joint]
         self.spring_rate = rate
-        self.length = length
         self.id = id
         self.driven = False
         self.position_set = False
@@ -48,8 +48,8 @@ class Link():
     def update_length(self):
         if self.spring_rate is None:
             return
-        
-        self.length = self.length + self.load.mag.tension_N/self.spring_rate
+
+        self.length = self.natural_length + self.load.mag.tension_N / self.spring_rate
     
     def set_load(self, load: Tension):
         self.update_length(load)

@@ -5,10 +5,13 @@ import copy
 import matplotlib.pyplot as plt
 
 class Body:
-    def __init__(self, mass: Mass, wheelbase_mm: int, leg: Linkage):
+    def __init__(self, mass: Mass, wheelbase_mm: int, leg: Linkage, convergence_threshold: float = 0.1):
         self.mass = mass
         self.wheelbase_mm = wheelbase_mm
         self.cog = Coordinate.origin()
+        self.torso_angle = Angle.from_degrees(0)
+        self.convergence_threshold = convergence_threshold
+        self.history: list[dict] = []
 
         self.front_leg = leg
         self.rear_leg = copy.deepcopy(leg)
@@ -20,8 +23,15 @@ class Body:
         self.front_leg.translate(Coordinate(-self.wheelbase_mm/2, 0))
         self.rear_leg.translate(Coordinate(self.wheelbase_mm/2, 0))
 
+        print(f"COG: ({self.cog.x}, {self.cog.y})")
         print(f"[{self.front_leg.id}] foot position: {self.front_leg.foot.position.x}, {self.front_leg.foot.position.y}")
         print(f"[{self.rear_leg.id}] foot position: {self.rear_leg.foot.position.x}, {self.rear_leg.foot.position.y}")
+
+        initial_reactions = ForceVector.find_vertical_reactions(
+            [[self.weight, self.cog]],
+            [self.front_leg.foot.position, self.rear_leg.foot.position],
+        )
+        self._snapshot(initial_reactions, label="initial")
 
         
 
@@ -30,7 +40,7 @@ class Body:
         last_reactions = None
         reactions = ForceVector.find_vertical_reactions([[self.weight, self.cog]], [self.front_leg.foot.position, self.rear_leg.foot.position])
 
-        while self.reactions_not_converged(reactions, last_reactions):
+        while self.reactions_not_converged(reactions, last_reactions, self.convergence_threshold):
             print("iterating")
 
             last_reactions = reactions.copy()
@@ -52,33 +62,12 @@ class Body:
                     link.update_length()
                     print(f"Leg: [{leg.id}], link: [{link.id}], load direction: {link.load.dir.deg} magnitude: {link.load.mag.tension_N}, lew length: {link.length}")
 
-            torso_angle = Angle.from_degrees(0)
             target_foot_positions: list[Coordinate] = []
 
             for leg in self.legs:
-                target_foot_positions.append(leg.foot.position)
-        
+                target_foot_positions.append(Coordinate(leg.foot.position.x, leg.foot.position.y))
+
             for leg in self.legs:
-                if leg == self.front_leg:
-                    mulitplier = 1
-                else:
-                    mulitplier = -1
-                leg.joints[0].position.x = self.cog.x - mulitplier * (((wheelbase_mm + servo_seperation_mm)/2) * np.cos(torso_angle.rad))
-                leg.joints[0].position.y = self.cog.y - mulitplier * (((wheelbase_mm + servo_seperation_mm)/2) * np.sin(torso_angle.rad))
-                leg.joints[-1].position.x = self.cog.x - mulitplier * (((wheelbase_mm - servo_seperation_mm)/2) * np.cos(torso_angle.rad))
-                leg.joints[-1].position.y = self.cog.y - mulitplier * (((wheelbase_mm - servo_seperation_mm)/2) * np.sin(torso_angle.rad))
-
-                if leg == self.front_leg:
-                    leg.links[0].direction.from_degrees(np.degrees(np.pi) + torso_angle.deg - leg.links[0].direction.deg)
-                    leg.links[-1].direction.from_degrees(leg.links[-1].direction.deg - torso_angle.deg)
-                
-                else:
-                    leg.links[0].direction = Angle.from_degrees(np.degrees(np.pi) + torso_angle.deg - leg.links[0].direction.deg)
-                    leg.links[-1].direction = Angle.inverse(Angle.from_degrees(leg.links[-1].direction.deg - torso_angle.deg))
-
-                leg.joints[1].position = Coordinate.find_end_point(leg.joints[0].position, leg.links[0].length, leg.links[0].direction)
-                leg.joints[-2].position = Coordinate.find_end_point(leg.joints[-1].position, leg.links[-1].length, leg.links[-1].direction)
-
                 calf1_circle = Circle(leg.joints[1].position, leg.links[1].length)
                 calf2_circle = Circle(leg.joints[-2].position, leg.links[-2].length)
 
@@ -89,14 +78,18 @@ class Body:
             self.translate(left_foot_error)
 
             feet_seperation = Coordinate.distance_between_points(self.legs[1].foot.position, self.legs[0].foot.position)
-            torso_angle_error = Angle.from_radians(np.atan2(feet_seperation.y,feet_seperation.x)*2)
+            torso_angle_error = Angle.from_radians(np.atan2(feet_seperation.y,feet_seperation.x))
             self.rotate(self.legs[0].foot.position, torso_angle_error)
 
             reactions = ForceVector.find_vertical_reactions([[self.weight, self.cog]], [self.front_leg.foot.position, self.rear_leg.foot.position])
-        
+            self._snapshot(reactions, label=f"iter {len(self.history)}")
+
         print("Converged")
+        print(f"COG: ({self.cog.x}, {self.cog.y})")
+        print(f"Torso Angle: {self.torso_angle.deg}°")
         print(f"[{self.front_leg.id}] foot position: {self.front_leg.foot.position.x}, {self.front_leg.foot.position.y}")
         print(f"[{self.rear_leg.id}] foot position: {self.rear_leg.foot.position.x}, {self.rear_leg.foot.position.y}")
+
 
 
 
@@ -106,16 +99,15 @@ class Body:
 
 
     @staticmethod
-    def reactions_not_converged(current_reactions: list[tuple[ForceVector, Coordinate]], last_reactions: list[tuple[ForceVector, Coordinate]] | None) -> bool:
+    def reactions_not_converged(current_reactions: list[tuple[ForceVector, Coordinate]], last_reactions: list[tuple[ForceVector, Coordinate]] | None, threshold: float = 0.1) -> bool:
         if last_reactions is None:
             return True
-        threshold = 0.1
         for i in range (len(current_reactions)):
             if np.abs(current_reactions[i][0].dir.rad) - np.abs(last_reactions[i][0].dir.rad) > threshold:
                 print(f"Reactions directions don't match")
                 return True
             if np.abs(current_reactions[i][0].mag.tension_N) - np.abs(last_reactions[i][0].mag.tension_N) > threshold:
-                print("Reaction Magntides don't match")
+                print("Reaction Magnitudes don't match")
                 return True
             if np.abs(current_reactions[i][1].x) - np.abs(last_reactions[i][1].x) > threshold:
                 print("Reaction x coords don't match")
@@ -136,7 +128,34 @@ class Body:
         for leg in self.legs:
             leg.rotate(centre, angle)
         self.cog = Coordinate.rotate(self.cog, centre, angle)
+        self.torso_angle = Angle.from_radians(self.torso_angle.rad + angle.rad)
 
+    def _snapshot(self, reactions, label: str = ""):
+        legs_data = []
+        for leg in self.legs:
+            joints_xy = [(j.position.x, j.position.y) for j in leg.joints]
+            links_data = []
+            for link in leg.links:
+                links_data.append({
+                    "id": link.id,
+                    "length": link.length,
+                    "natural_length": link.natural_length,
+                    "load_N": link.load.mag.tension_N,
+                    "direction_deg": link.direction.deg if link.direction is not None else 0.0,
+                })
+            legs_data.append({
+                "id": leg.id,
+                "joints": joints_xy,
+                "links": links_data,
+                "foot": (leg.foot.position.x, leg.foot.position.y),
+            })
+        self.history.append({
+            "label": label,
+            "cog": (self.cog.x, self.cog.y),
+            "torso_angle_deg": self.torso_angle.deg,
+            "legs": legs_data,
+            "reactions_N": [r[0].y_component for r in reactions],
+        })
 
             #now both linkages and the torso line have been translated, need to rotate them both until the second foot error = 0
             #can do this iteratively but be better to do some math really 
