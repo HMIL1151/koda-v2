@@ -50,6 +50,12 @@ class Coordinate:
         rotated_y = dx * np.sin(-angle.rad) + dy * np.cos(-angle.rad)
 
         return Coordinate(centre.x + rotated_x, centre.y + rotated_y)
+    
+    @staticmethod
+    def get_angle_from_points(start: Coordinate, end: Coordinate) -> Angle:
+        dx = end.x - start.x
+        dy = end.y - start.y
+        return Angle.from_radians(np.atan2(dy, dx))
 
 class Circle:
     def __init__(self, centre: Coordinate, radius: float):
@@ -130,6 +136,9 @@ class ForceVector:
     def __init__(self, dir: Angle, mag: Tension):
         self.dir = dir
         self.mag = mag
+
+    def __add__(self, other: ForceVector) -> ForceVector:
+        return ForceVector.from_components(self.x_component + other.x_component, self.y_component + other.y_component)
     
     @classmethod
     def from_components(cls, x, y):
@@ -161,13 +170,18 @@ class ForceVector:
 
     @staticmethod
     def find_equilibrium_vector(vectors: list[ForceVector]) -> ForceVector:    
+        sum = ForceVector.sum_forces(vectors)
+        return ForceVector.from_components(-sum.x_component, -sum.y_component)
+    
+    @staticmethod
+    def sum_forces(forces: list[ForceVector]) -> ForceVector:
         x_component_sum = 0
         y_component_sum = 0
-        for vector in vectors:
-            x_component_sum = x_component_sum + vector.x_component
-            y_component_sum = y_component_sum + vector.y_component
+        for force in forces:
+            x_component_sum = x_component_sum + force.x_component
+            y_component_sum = y_component_sum + force.y_component
     
-        return ForceVector.from_components(-x_component_sum, -y_component_sum)
+        return ForceVector.from_components(x_component_sum, y_component_sum)
     
     @staticmethod
     def find_equilibirum_vectors(known_loads: list[ForceVector], unknown_load_directions: list[Angle]) -> list[ForceVector]:
@@ -224,6 +238,15 @@ class ForceVector:
 
         return [(reaction1, reaction_centers[0]), (reaction2, reaction_centers[1])]
 
+
+class Torque():
+    def __init__(self, torque: float):
+        self.torque_Nmm = torque
+
+    @classmethod
+    def from_Nmm(cls, torque: float) -> Torque:
+        return cls(torque)
+    
         
 
 
