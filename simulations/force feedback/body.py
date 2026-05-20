@@ -90,14 +90,6 @@ class Body:
         print(f"[{self.front_leg.id}] foot position: {self.front_leg.foot.position.x}, {self.front_leg.foot.position.y}")
         print(f"[{self.rear_leg.id}] foot position: {self.rear_leg.foot.position.x}, {self.rear_leg.foot.position.y}")
 
-
-
-
-
-
-            
-
-
     @staticmethod
     def reactions_not_converged(current_reactions: list[tuple[ForceVector, Coordinate]], last_reactions: list[tuple[ForceVector, Coordinate]] | None, threshold: float = 0.1) -> bool:
         if last_reactions is None:
@@ -157,49 +149,4 @@ class Body:
             "reactions_N": [r[0].y_component for r in reactions],
         })
 
-            #now both linkages and the torso line have been translated, need to rotate them both until the second foot error = 0
-            #can do this iteratively but be better to do some math really 
-
-
-        #torso centre has now been set, now need to t
-    
-
-
-        
-
-
-    
-
-
-        
-
-
-
-
-    def draw_body(self):
-        x_coords = []
-        y_coords = []
-        colors = []
-
-        for leg in self.legs:
-            for joint in leg.joints:
-                x_coords.append(joint.position.x)
-                y_coords.append(joint.position.y)
-            
-                if joint.id == "foot":
-                    colors.append('red')
-                elif joint.id == "front knee" or joint.id == "rear knee":
-                    colors.append('green') 
-                else:
-                    colors.append('blue')
-
-        colors.append('black')
-        x_coords.append(self.cog.x)
-        y_coords.append(self.cog.y)
-
-                
-
-        plt.scatter(x_coords, y_coords, c=colors)
-        plt.axis('equal')
-        plt.show()
-        
+  
