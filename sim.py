@@ -338,19 +338,10 @@ class RobotDogApp(tk.Tk):
 
     # ── Controls panel ──────────────────────────────────────────────────
 
-    def _build_controls(self, parent):
-        outer = tk.Canvas(parent, bg=DARK, highlightthickness=0)
-        sb    = ttk.Scrollbar(parent, orient=tk.VERTICAL, command=outer.yview)
-        outer.configure(yscrollcommand=sb.set)
-        sb.pack(side=tk.RIGHT, fill=tk.Y)
-        outer.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        inner = tk.Frame(outer, bg=DARK)
-        win_id = outer.create_window((0, 0), window=inner, anchor="nw")
-        inner.bind("<Configure>",
-                   lambda e: outer.configure(scrollregion=outer.bbox("all")))
-        outer.bind("<Configure>",
-                   lambda e: outer.itemconfig(win_id, width=e.width))
+    def _build_controls(self, parent):
+        inner = tk.Frame(parent, bg=DARK)
+        inner.pack(fill=tk.BOTH, expand=True)
 
         def section(title):
             f = tk.LabelFrame(inner, text=f"  {title}  ",
@@ -368,25 +359,25 @@ class RobotDogApp(tk.Tk):
             ("rear_thigh1_deg",  "Rear  Hip-1"),
             ("rear_thigh2_deg",  "Rear  Hip-2"),
         ]:
-            self._slider(tf, key, lbl, -180, 180, 0.5)
+            self._slider(tf, key, lbl, -180, 180, 0.5, is_length=False)
 
-        # ── Geometry
+        # ── Geometry (all lengths in mm for UI)
         gf = section("Geometry")
         for key, lbl, lo, hi, res in [
-            ("body_length",   "Body Length (m)",   0.15, 0.4, 0.01),
-            ("thigh_length",  "Thigh Len   (m)",   0.02, 0.2, 0.005),
-            ("calf_free_len", "Calf Free   (m)",   0.4, 0.2, 0.005),
-            ("hip_spread",    "Hip Spread  (m)",   0.01, 0.08, 0.005),
+            ("body_length",   "Body Length (mm)",   150, 400, 1),
+            ("thigh_length",  "Thigh Len   (mm)",    20, 200, 1),
+            ("calf_free_len", "Calf Free   (mm)",    40, 200, 1),
+            ("hip_spread",    "Hip Spread  (mm)",    10, 80, 1),
         ]:
-            self._slider(gf, key, lbl, lo, hi, res)
+            self._slider(gf, key, lbl, lo, hi, res, is_length=True)
 
         # ── Physics
         pf = section("Physics")
         for key, lbl, lo, hi, res in [
-            ("body_mass",     "Mass  (kg)",    1.0,  5.0, 0.2),
+            ("body_mass",     "Mass  (kg)",    1.0,  50.0, 0.2),
             ("calf_spring_k", "Spring k (N/m)", 200, 8000, 50),
         ]:
-            self._slider(pf, key, lbl, lo, hi, res)
+            self._slider(pf, key, lbl, lo, hi, res, is_length=False)
 
         # ── Initial guess
         ig = section("Solver Initial Guess")
@@ -395,7 +386,7 @@ class RobotDogApp(tk.Tk):
             ("torso_y",        "Torso Y (m)",    0.05, 0.9, 0.01),
             ("torso_theta_deg","Pitch (°)",      -30,  30,  0.5),
         ]:
-            self._slider(ig, key, lbl, lo, hi, res)
+            self._slider(ig, key, lbl, lo, hi, res, is_length=False)
 
         # ── Status line
         self._status_var = tk.StringVar(value="Initialising…")
@@ -420,32 +411,80 @@ class RobotDogApp(tk.Tk):
             relief=tk.FLAT, state=tk.DISABLED)
         self._error_text.pack(padx=6, pady=2, fill=tk.X)
 
-    def _slider(self, parent, key, label, lo, hi, resolution):
+
+    def _slider(self, parent, key, label, lo, hi, resolution, is_length=False):
         row = tk.Frame(parent, bg=PANEL)
-        row.pack(fill=tk.X, pady=1)
+        row.pack(fill=tk.X, pady=2)
 
+        # Label
         tk.Label(row, text=label, fg=MUTED, bg=PANEL,
-                 font=(MONO, 8), width=16, anchor=tk.W).pack(side=tk.LEFT)
+                 font=(MONO, 8), width=16, anchor=tk.W).pack(side=tk.LEFT, padx=(0, 2))
 
-        var = tk.DoubleVar(value=self.params[key])
+        # For length parameters, store in meters internally, show mm in UI
+        if is_length:
+            val = self.params[key] * 1000
+        else:
+            val = self.params[key]
+
+        var = tk.DoubleVar(value=val)
         self._sliders[key] = var
 
-        val_lbl = tk.Label(row, text=f"{var.get():.2f}",
-                           fg=BLUE, bg=PANEL, font=(MONO, 8), width=7)
-        val_lbl.pack(side=tk.RIGHT)
+        # Frame for slider and entry
+        input_frame = tk.Frame(row, bg=PANEL)
+        input_frame.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
-        def on_change(_=None):
-            val_lbl.config(text=f"{var.get():.2f}")
-            self._on_slider()
-
-        tk.Scale(row, variable=var,
+        # Slider
+        scale = tk.Scale(input_frame, variable=var,
                  from_=lo, to=hi, resolution=resolution,
                  orient=tk.HORIZONTAL, showvalue=False,
                  bg=PANEL, fg=GREEN,
                  troughcolor=DARK, activebackground="#27ae60",
                  highlightthickness=0, bd=0,
-                 command=on_change
-                 ).pack(side=tk.LEFT, fill=tk.X, expand=True)
+                 length=120,
+                 command=lambda _: self._on_slider())
+        scale.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 4))
+
+        # Numeric entry with border and clear label
+        entry_frame = tk.Frame(input_frame, bg=PANEL)
+        entry_frame.pack(side=tk.LEFT, padx=(0, 0))
+        tk.Label(entry_frame, text="Value:", fg=MUTED, bg=PANEL, font=(MONO, 8)).pack(side=tk.LEFT)
+        entry = tk.Entry(entry_frame, width=7, font=(MONO, 8),
+                         relief=tk.RIDGE, bd=2, justify='right', bg="#222933", fg=BLUE, insertbackground=BLUE)
+        entry.pack(side=tk.LEFT)
+        entry.config(highlightbackground=BORDER, highlightcolor=BLUE)
+        entry.insert(0, f"{val:.1f}")
+        entry.bind('<FocusIn>', lambda e: entry.select_range(0, tk.END))
+        entry.bind('<Return>', lambda e: self._on_slider())
+
+        # Validate input
+        def validate_entry(P):
+            if P == "" or P == "-":
+                return True
+            try:
+                float(P)
+                return True
+            except Exception:
+                return False
+        vcmd = (row.register(validate_entry), '%P')
+        entry.config(validate='key', validatecommand=vcmd)
+
+        # Keep entry and slider in sync, but only set var if valid
+        def on_entry_change(event=None):
+            val_str = entry.get()
+            try:
+                v = float(val_str)
+                var.set(v)
+            except Exception:
+                pass  # Don't update var if not a valid float
+        entry.bind('<KeyRelease>', on_entry_change)
+
+        # Update entry when slider moves, but only if entry is not focused
+        def on_var_change(*_):
+            if entry.focus_get() != entry:
+                v = var.get()
+                entry.delete(0, tk.END)
+                entry.insert(0, f"{v:.1f}")
+        var.trace_add('write', lambda *_: on_var_change())
 
     # ── Plots panel ──────────────────────────────────────────────────────
 
@@ -479,10 +518,16 @@ class RobotDogApp(tk.Tk):
     #  CALLBACKS
     # ──────────────────────────────────────────────────────────────────────
 
+
     def _on_slider(self):
         """Sync all slider vars → self.params, then re-solve."""
         for key, var in self._sliders.items():
-            self.params[key] = var.get()
+            val = var.get()
+            # Convert mm to m for length params
+            if key in ("body_length", "thigh_length", "calf_free_len", "hip_spread"):
+                self.params[key] = val / 1000.0
+            else:
+                self.params[key] = val
         self._run_simulation()
 
     def _reset_feet_and_solve(self):

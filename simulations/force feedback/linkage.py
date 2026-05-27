@@ -13,6 +13,7 @@ class Linkage():
         self.populate_linkage()
         self.foot: Joint = self.joints[2]
         self.solve_forward_kinematics()
+        self.translate(Coordinate.negative(self.foot.position))
         
     
     def find_starting_joint(self):

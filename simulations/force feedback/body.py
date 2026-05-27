@@ -24,6 +24,9 @@ class Body:
         self.front_leg.translate(Coordinate(-self.wheelbase_mm/2, 0))
         self.rear_leg.translate(Coordinate(self.wheelbase_mm/2, 0))
         self.translate(Coordinate(0, -self.rear_leg.foot.position.y))
+        self.torso = Line(self.legs[0].joints[0].position, self.legs[1].joints[-1].position)
+        self.cog = self.torso.midpoint
+
 
         print(f"COG: ({self.cog.x}, {self.cog.y})")
         print(f"[{self.front_leg.id}] foot position: {self.front_leg.foot.position.x}, {self.front_leg.foot.position.y}")
@@ -82,6 +85,20 @@ class Body:
             thigh_forces.append(ForceVector(calf_directions[i], Tension.from_newtons(extension * spring_rate_N_per_mm)))
         
         return thigh_forces
+    
+    def draw(self):
+        x_coords = []
+        y_coords = []
+        for leg in self.legs:
+            for joint in leg.joints:
+                x_coords.append(joint.position.x)
+                y_coords.append(joint.position.y)
+        x_coords.append(self.cog.x)
+        y_coords.append(self.cog.y)
+        
+        plt.scatter(x_coords, y_coords)
+        plt.axis('equal')
+        plt.show()
 
             
 

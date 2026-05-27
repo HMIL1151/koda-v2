@@ -50,6 +50,10 @@ class Coordinate:
         rotated_y = dx * np.sin(-angle.rad) + dy * np.cos(-angle.rad)
 
         return Coordinate(centre.x + rotated_x, centre.y + rotated_y)
+
+    @staticmethod
+    def negative(point: Coordinate) -> Coordinate:
+        return Coordinate(-point.x, -point.y)
     
     @staticmethod
     def get_angle_from_points(start: Coordinate, end: Coordinate) -> Angle:
@@ -90,6 +94,23 @@ class Circle:
                 raise ValueError("No intersections found")
 
         return intersection_coords
+
+class Line:
+    def __init__(self, point1: Coordinate, point2: Coordinate):
+        self.point1 = point1
+        self.point2 = point2
+
+    @property
+    def length(self) -> float:
+        dx = np.abs(self.point1.x - self.point2.x)
+        dy = np.abs(self.point1.y - self.point2.y)
+        return np.hypot(dx, dy)
+    
+    @property
+    def midpoint(self) -> Coordinate:
+        dx = (self.point2.x - self.point1.x)/2
+        dy = (self.point2.y - self.point1.y)/2
+        return Coordinate(self.point1.x + dx, self.point2.y + dy)
 
 class Tension:
     def __init__(self, tension: float):
