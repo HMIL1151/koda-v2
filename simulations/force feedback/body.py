@@ -23,10 +23,13 @@ class Body:
 
         self.front_leg.translate(Coordinate(-self.wheelbase_mm/2, 0))
         self.rear_leg.translate(Coordinate(self.wheelbase_mm/2, 0))
+        self.translate(Coordinate(0, -self.rear_leg.foot.position.y))
 
         print(f"COG: ({self.cog.x}, {self.cog.y})")
         print(f"[{self.front_leg.id}] foot position: {self.front_leg.foot.position.x}, {self.front_leg.foot.position.y}")
         print(f"[{self.rear_leg.id}] foot position: {self.rear_leg.foot.position.x}, {self.rear_leg.foot.position.y}")
+
+        
 
         initial_reactions = ForceVector.find_vertical_reactions(
             [[self.weight, self.cog]],
@@ -44,7 +47,7 @@ class Body:
     def get_knee_positions(self, cog: Coordinate, input_torso_angle: Angle) -> list[Coordinate]:
         knee_positions = []
 
-        half_torso_length = wheelbase_mm/2
+        half_torso_length = self.wheelbase_mm/2
         thigh_length = self.front_leg.links[0].length
         torso_angle = input_torso_angle.rad
         x = cog.x
@@ -105,9 +108,9 @@ class Body:
         
 
         initial_guess = [
-            sum_foot_x/2,
-            self.cog.y,
-            self.torso_angle.rad
+            0,
+            self.cog.y*2,
+            np.radians(45)
         ]
 
 
