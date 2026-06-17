@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Robot Leg Physics</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app">
+        <h1>Robot on a Slope</h1>
+
+        <div class="modebar">
+            <button id="modeSimulate" class="mode active">Simulate &nbsp;<small>ground &rarr; springs</small></button>
+            <button id="modeInfer" class="mode">Infer &nbsp;<small>springs &rarr; ground</small></button>
+        </div>
+
+        <div class="main">
+            <div class="canvas-wrap">
+                <canvas id="legCanvas" width="640" height="460"></canvas>
+                <div id="warn" class="warn hidden"></div>
+
+                <div id="animbar" class="animbar">
+                    <select id="animMode" class="sel">
+                        <option value="walk">Walk</option>
+                        <option value="sweep">Tilt sweep</option>
+                    </select>
+                    <select id="terrainSel" class="sel">
+                        <option value="bumps">Bumps</option>
+                        <option value="flat">Flat</option>
+                        <option value="slope">Slope</option>
+                    </select>
+                    <button id="stepBack" class="btn" title="Step back">&#9198;</button>
+                    <button id="playBtn" class="btn">&#9654; Play</button>
+                    <button id="stepFwd" class="btn" title="Step forward">&#9197;</button>
+                    <button id="resetBtn" class="btn" title="Reset">&#10227; Reset</button>
+                    <input type="range" id="scrub" class="scrub" min="0" max="1000" value="0">
+                    <label class="speed">Speed <input type="range" id="animSpeed" min="0.25" max="3" step="0.25" value="1"></label>
+                    <button id="recBtn" class="btn rec">&#9679; Record</button>
+                    <span id="recStatus" class="recstatus"></span>
+                </div>
+            </div>
+
+            <div class="panel">
+                <section>
+                    <h2>Thigh angles</h2>
+                    <label class="check"><input type="checkbox" id="linkThighs" checked> Link each leg's pair</label>
+                    <label>Front leg · front thigh <span id="thigh_flFVal">120&deg;</span></label>
+                    <input type="range" id="thigh_flF" min="91" max="179" value="120" step="1">
+                    <label>Front leg · rear thigh <span id="thigh_flRVal">120&deg;</span></label>
+                    <input type="range" id="thigh_flR" min="91" max="179" value="120" step="1">
+                    <label>Rear leg · front thigh <span id="thigh_rlFVal">120&deg;</span></label>
+                    <input type="range" id="thigh_rlF" min="91" max="179" value="120" step="1">
+                    <label>Rear leg · rear thigh <span id="thigh_rlRVal">120&deg;</span></label>
+                    <input type="range" id="thigh_rlR" min="91" max="179" value="120" step="1">
+                    <label>Leg spacing <span id="legBaseVal">150 mm</span></label>
+                    <input type="range" id="legBase" min="50" max="220" value="150" step="5">
+                </section>
+
+                <section id="simInputs">
+                    <h2>Ground &amp; Load</h2>
+                    <label>Ground angle <span id="groundAngleVal">5&deg;</span></label>
+                    <input type="range" id="groundAngle" min="-30" max="30" value="5" step="1">
+                    <label>Weight <span id="weightVal">40 N</span></label>
+                    <input type="range" id="weight" min="5" max="120" value="40" step="1">
+                    <label>CoM fore/aft <span id="comOffsetVal">0 mm</span></label>
+                    <input type="range" id="comOffset" min="-80" max="80" value="0" step="2">
+                    <label>CoM height <span id="comHeightVal">0 mm</span></label>
+                    <input type="range" id="comHeight" min="-40" max="120" value="0" step="5">
+                    <label>Spring rate <span id="springRateVal">3.0 N/mm</span></label>
+                    <input type="range" id="springRate" min="0.5" max="10" value="3" step="0.1">
+                    <label>Spring travel: min (preload) <span id="minCompVal">1.0 mm</span></label>
+                    <input type="range" id="minComp" min="0" max="15" value="1" step="0.5">
+                    <label>Spring travel: max <span id="maxCompVal">25 mm</span></label>
+                    <input type="range" id="maxComp" min="10" max="40" value="25" step="1">
+                </section>
+
+                <section id="inferInputs" class="hidden">
+                    <h2>Front Leg Springs</h2>
+                    <label>Front calf <span id="flFVal">6.0 mm</span></label>
+                    <input type="range" id="flF" min="0" max="30" value="6" step="0.5">
+                    <label>Rear calf <span id="flRVal">2.5 mm</span></label>
+                    <input type="range" id="flR" min="0" max="30" value="2.5" step="0.5">
+                    <h2>Rear Leg Springs</h2>
+                    <label>Front calf <span id="rlFVal">8.0 mm</span></label>
+                    <input type="range" id="rlF" min="0" max="30" value="8" step="0.5">
+                    <label>Rear calf <span id="rlRVal">4.5 mm</span></label>
+                    <input type="range" id="rlR" min="0" max="30" value="4.5" step="0.5">
+                </section>
+
+                <section class="readouts" id="outputs"></section>
+                <section class="legend" id="legend"></section>
+            </div>
+        </div>
+    </div>
+    <script type="module" src="./src/main.js"></script>
+</body>
+</html>

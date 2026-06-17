@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Foot-Reach Optimiser</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app">
+        <h1>5-Bar Leg · Foot-Reach Optimiser
+            <small>tune link lengths for the biggest stride × clearance the foot can sweep</small>
+        </h1>
+
+        <div class="main">
+            <div class="canvas-wrap">
+                <canvas id="legCanvas" width="640" height="460"></canvas>
+
+                <div class="animbar">
+                    <button id="playBtn" class="btn">▶ Play</button>
+                    <button id="stepBtn" class="btn" title="One optimiser tick">⏭ Step</button>
+                    <button id="resetBtn" class="btn" title="Restart the search">↺ Reset</button>
+                    <button id="adoptBtn" class="btn" title="Use the current best as the new starting point">★ Adopt best</button>
+                    <label class="speed">Speed <input type="range" id="speed" min="1" max="20" step="1" value="4"></label>
+                </div>
+            </div>
+
+            <div class="panel">
+                <section>
+                    <h2>Dimensions <small>(lock to hold constant)</small></h2>
+                    <div id="varRows"></div>
+                </section>
+
+                <section>
+                    <h2>Search</h2>
+                    <label class="row">Algorithm <select id="algo" class="sel"></select></label>
+                    <label class="row">Grid quality
+                        <select id="quality" class="sel">
+                            <option value="fast">Fast (40)</option>
+                            <option value="medium" selected>Medium (60)</option>
+                            <option value="fine">Fine (80)</option>
+                        </select>
+                    </label>
+                    <label class="row">Thigh angle min <input type="number" id="angleMin" class="vin small" value="91" step="1"></label>
+                    <label class="row">Thigh angle max <input type="number" id="angleMax" class="vin small" value="179" step="1"></label>
+                </section>
+
+                <section class="readouts" id="outputs"></section>
+
+                <section class="legend">
+                    <div><span class="sw dot" style="background:#3498db"></span> reachable foot workspace</div>
+                    <div><span class="sw box"></span> stride × clearance (the score)</div>
+                    <div><span class="sw dot" style="background:#e67e22"></span> calves &nbsp; <span class="sw dot" style="background:#3498db"></span> thighs &nbsp; <span class="sw dot" style="background:#e74c3c"></span> foot</div>
+                    <div><span class="sw box ghost"></span> evolutionary population (ghosts)</div>
+                </section>
+            </div>
+        </div>
+    </div>
+    <script type="module" src="./src/main.js"></script>
+</body>
+</html>
