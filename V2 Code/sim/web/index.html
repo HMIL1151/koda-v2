@@ -10,9 +10,18 @@
          font: 14px/1.5 ui-sans-serif, system-ui, sans-serif; }
   header { padding: 10px 16px; border-bottom: 1px solid #1c2330; }
   header b { color: #e8eef5; }
-  .wrap { display: grid; grid-template-columns: 1fr 360px; gap: 14px; padding: 14px; }
-  canvas { width: 100%; background: #11151c; border: 1px solid #1c2330; border-radius: 8px; display: block; }
-  .views { display: grid; grid-template-rows: 1fr 1fr; gap: 14px; }
+
+  .wrap { max-width: 1600px; margin: 0 auto; padding: 14px;
+          display: flex; flex-direction: column; gap: 14px; }
+  /* Top: big side (walking-profile) view on the left; small top view + live readout right. */
+  .stage { display: grid; grid-template-columns: 1fr 340px; gap: 14px; align-items: start; }
+  .viz-right { display: flex; flex-direction: column; gap: 14px; }
+  /* Bottom: control panels spread across the full width (not one long squashed column). */
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+              gap: 14px; align-items: start; }
+
+  canvas { width: 100%; height: auto; background: #11151c; border: 1px solid #1c2330;
+           border-radius: 8px; display: block; }
   .panel { background: #11151c; border: 1px solid #1c2330; border-radius: 8px; padding: 14px; }
   .panel h3 { margin: 0 0 8px; font-size: 13px; color: #e8eef5; }
   .row { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
@@ -22,8 +31,9 @@
   button:hover { background: #263347; }
   select, input[type=number] { background: #0d1219; color: #cdd6e2; border: 1px solid #2a3850;
            border-radius: 6px; padding: 5px; }
-  pre#hud { background: #0d1219; border: 1px solid #1c2330; border-radius: 6px; padding: 10px;
-            white-space: pre-wrap; color: #9fd0ff; min-height: 120px; }
+  pre#hud, pre#advisor { background: #0d1219; border: 1px solid #1c2330; border-radius: 6px;
+            padding: 10px; margin: 0; white-space: pre-wrap; color: #9fd0ff; }
+  pre#hud { min-height: 150px; }
   kbd { background: #1d2735; border: 1px solid #2a3850; border-radius: 4px; padding: 1px 6px; }
   .keys { color: #8b97a8; font-size: 12px; }
   .events-log { margin-top: 8px; max-height: 150px; overflow-y: auto; font: 12px ui-monospace, monospace;
@@ -38,12 +48,17 @@
 </header>
 
 <div class="wrap">
-  <div class="views">
-    <canvas id="side" width="900" height="380"></canvas>
-    <canvas id="top" width="900" height="300"></canvas>
+  <!-- Views: large side (walking profile) + small top-down with the live readout beside it. -->
+  <div class="stage">
+    <canvas id="side" width="1000" height="380"></canvas>
+    <div class="viz-right">
+      <canvas id="top" width="340" height="280"></canvas>
+      <div class="panel"><h3>Readout</h3><pre id="hud"></pre></div>
+    </div>
   </div>
 
-  <div>
+  <!-- Controls: spread horizontally across the full width. -->
+  <div class="controls">
     <div class="panel">
       <h3>Transport</h3>
       <div class="row">
@@ -92,13 +107,8 @@
     </div>
 
     <div class="panel">
-      <h3>Readout</h3>
-      <pre id="hud"></pre>
-    </div>
-
-    <div class="panel">
       <h3>Spring advisor</h3>
-      <div class="row"><label>Sensor res</label><input id="sensorRes" type="number" value="0.05" step="0.01" min="0.005" /> <span class="keys">mm resolvable (the key unknown)</span></div>
+      <div class="row"><label>Sensor res</label><input id="sensorRes" type="number" value="0.05" step="0.01" min="0.005" /> <span class="keys">mm resolvable</span></div>
       <pre id="advisor"></pre>
     </div>
 
