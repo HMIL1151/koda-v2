@@ -21,7 +21,7 @@ const defaults = {
   descentSpeedMmS: 150,    // foot vertical speed near landing (TUNE: ~ step height × cadence)
   detectTicks: 2,          // control ticks allowed to register a contact
   dtS: 0.02,               // 50 Hz control tick
-  stanceFeet: 2,           // trot supports on 2 feet
+  feet: 4,                 // feet on the ground while slope sensing
   springTravelMm: 16,      // physical spring travel available
 };
 

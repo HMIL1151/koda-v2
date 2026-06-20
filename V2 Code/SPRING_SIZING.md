@@ -59,12 +59,18 @@ Stiffer springs make the force rise faster → quicker, crisper early/late conta
 
 ### Travel
 
-The spring must not bottom out under the worst-case single-foot load (≈ `W / feet-in-stance`,
-so `W/2` in a trot) and needs headroom for the slope-range compression swing:
+Travel only has to survive **slope sensing** — standing with **all feet down** on the
+steepest slope. The worst (downhill) foot carries the even share `W/feet` plus the slope
+redistribution, so
 
 ```
-travel ≥ W/stance_feet / k  +  W·h·tan θ_max / (L·k)
+F_worst = (W/feet)·(1 + 2·h·tan θ_max / L)      travel ≥ F_worst / k
 ```
+
+Walking on two feet loads a foot more (≈ `W/2`), **but that doesn't constrain the travel**:
+force isn't measured while walking, and a transient bottom-out is harmless — early/late
+contact still fires from the force *rising* past the threshold, even at the stop. (The only
+thing lost at bottom-out is force *magnitude*, which walking doesn't use.)
 
 ## Using it
 
@@ -78,12 +84,12 @@ node tools/spring_sizing.mjs sensorResolutionMm=0.02 slopeMinDeg=2 mass=4
 Example (Koda V2 defaults — geometry from `config.h`, sensor/gait estimated):
 
 ```
-weight: 29.4 N   max foot load (2-foot support): 14.7 N
+weight: 29.4 N   worst foot load (static 20° slope sensing): 11.7 N
 spring-rate window:  k_min 0.67  <  k  <  k_max 8.37  N/mm
 recommended k: 2.36 N/mm
   → resolves slopes down to ~0.8°
   → detects contact in ~0.6 ticks
-  → needs ~9.9 mm travel (fits 16 mm ✓)
+  → needs ~5.0 mm travel (fits 16 mm ✓)
 ```
 
 The sim's current `HALL_SPRING_N_PER_MM` (≈1.69) sits inside that window, so the modelled

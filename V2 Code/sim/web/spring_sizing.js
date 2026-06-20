@@ -16,8 +16,11 @@
 //        k_min = F_thresh / (v · T_detect · dt).
 //    Stiffer springs (bigger k) → force rises faster → quicker contact detection.
 //
-//  • TRAVEL.  The spring must not bottom out under the worst-case foot load (≈ W / feet in
-//    stance) and must have headroom for the slope-range compression swing.
+//  • TRAVEL.  The spring must not bottom out while SLOPE SENSING — i.e. standing with all
+//    feet down on the steepest slope. The worst (downhill) foot then carries the even share
+//    W/feet plus the slope redistribution: F = (W/feet)·(1 + 2·h·tanθ_max/L). Walking 2-foot
+//    support loads a foot more, but we don't sense force while walking and a transient
+//    bottom-out is harmless (early/late contact still fires from the force *rising*).
 //
 // A usable design needs k_min < k_max; the recommended k is their geometric mean.
 
@@ -35,7 +38,8 @@ export function springWindow(p) {
   const v = p.descentSpeedMmS;                            // foot descent speed near landing, mm/s
   const Tdetect = p.detectTicks ?? 2;                     // ticks allowed to detect a contact
   const dt = p.dtS ?? 0.02;                               // control tick, s
-  const stanceFeet = p.stanceFeet ?? 2;                   // min feet supporting (trot = 2)
+  const feet = p.feet ?? 4;                               // feet on the ground while slope sensing
+  const slopeMax = (p.slopeMaxDeg ?? 20) * DEG;           // steepest slope we sense on
   const travelAvail = p.springTravelMm;                   // physical spring travel, mm
 
   const kMax = (W * h * Math.tan(thetaMin)) / (L * snr * sigma);
@@ -45,13 +49,16 @@ export function springWindow(p) {
 
   // What the recommended (or k_min) spring resolves / detects, and the travel it needs.
   const k = kRec ?? kMin;
-  const maxFootLoad = W / stanceFeet;
+  // Travel only has to survive STATIC slope sensing (all `feet` on the ground). The worst
+  // (downhill) foot carries the even share W/feet plus the slope redistribution
+  // ΔF/foot = W·h·tanθ/L over the two foot rows. Walking 2-foot support loads a foot more,
+  // but we don't sense force then and a transient bottom-out is harmless.
+  const maxFootLoad = (W / feet) * (1 + 2 * h * Math.tan(slopeMax) / L);
+  const travelNeeded = maxFootLoad / k;
   // Slope sensing at the recommended k → the slope angle that gives a just-resolvable ΔX.
   const resolvableSlopeDeg = Math.atan((snr * sigma * L * k) / (W * h)) / DEG;
   // Contact detection time at k.
   const detectTicksAt = Fthresh / (k * v * dt);
-  const slopeSwingMm = (W * h * Math.tan((p.slopeMaxDeg ?? 20) * DEG)) / (L * k);
-  const travelNeeded = maxFootLoad / k + slopeSwingMm;
 
   return {
     W, kMin, kMax, feasible, kRec,
@@ -65,7 +72,7 @@ export function report(p) {
   const r = springWindow(p);
   const L = (x, n = 2) => (x == null ? '—' : x.toFixed(n));
   const lines = [
-    `weight: ${L(r.W, 1)} N   max foot load (${p.stanceFeet ?? 2}-foot support): ${L(r.maxFootLoad, 1)} N`,
+    `weight: ${L(r.W, 1)} N   worst foot load (static ${p.slopeMaxDeg ?? 20}° slope sensing): ${L(r.maxFootLoad, 1)} N`,
     `spring-rate window:  k_min ${L(r.kMin)}  <  k  <  k_max ${L(r.kMax)}  N/mm`,
   ];
   if (!r.feasible) {
