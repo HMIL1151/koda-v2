@@ -1,0 +1,4 @@
+# Build artifacts from wasm/build.sh (regenerate with `npm run build`).
+# Delete these lines if you'd rather commit the built sim so it runs without Emscripten.
+koda-core.mjs
+koda-core.wasm

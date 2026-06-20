@@ -7,52 +7,52 @@
 namespace koda {
 
 namespace {
-constexpr float kSmoothing = 0.20f;     // EMA toward the target correction (ease-in)
-constexpr float kEps = 1e-3f;
+constexpr float kTiltSmoothing = 0.20f;   // EMA on the tilt-levelling term
 
 // Leg/force order: FL, FR, RR, RL.
 constexpr int FL = 0, FR = 1, RR = 2, RL = 3;
 }  // namespace
 
-BodyPose Balance::update(const float* forces, Tilt tilt) {
+BodyPose Balance::update(const float* forces, Tilt tilt, float dt) {
   // ── Load distribution from the foot forces ────────────────────────────────────────
   const float front = forces[FL] + forces[FR];
   const float rear  = forces[RR] + forces[RL];
   const float left  = forces[FL] + forces[RL];
   const float right = forces[FR] + forces[RR];
 
-  BodyPose target;
-
-  // 2) Re-centre the COG: shift the body toward whichever side is under-loaded so the
-  //    forces even out. Gains are mm-per-newton (config.h), output clamped.
+  // 1) Re-centre the COG (integral): shift the body until the loads equalise, i.e. until
+  //    the COG sits over the support centroid. Integrating means a slope is fully
+  //    corrected — the shift grows until the imbalance it senses is zero.
   //    NOTE: if the body moves the *wrong* way on the real robot, flip these two signs.
-  target.translation.x =
-      clampf(cfg::BALANCE_KP_SHIFT * (rear - front),
-             -cfg::BALANCE_MAX_SHIFT_MM, cfg::BALANCE_MAX_SHIFT_MM);
-  target.translation.z =
-      clampf(cfg::BALANCE_KP_SHIFT * (left - right),
-             -cfg::BALANCE_MAX_SHIFT_MM, cfg::BALANCE_MAX_SHIFT_MM);
-  target.translation.y = 0.0f;
+  pose_.translation.x = clampf(pose_.translation.x + cfg::BALANCE_KI_SHIFT * (rear - front) * dt,
+                               -cfg::BALANCE_MAX_SHIFT_MM, cfg::BALANCE_MAX_SHIFT_MM);
+  pose_.translation.z = clampf(pose_.translation.z + cfg::BALANCE_KI_SHIFT * (left - right) * dt,
+                               -cfg::BALANCE_MAX_SHIFT_MM, cfg::BALANCE_MAX_SHIFT_MM);
+  pose_.translation.y = 0.0f;
 
-  // 1) Level the torso: counter-rotate to drive the measured tilt back toward zero.
-  //    With no IMU, tilt is zero and these stay zero (force re-centring still works).
+  // 2) Level the torso: counter-rotate to drive the measured tilt toward zero. With no
+  //    IMU, tilt is zero and these stay zero (the force re-centring above still works).
   const float max_tilt = deg2rad(cfg::BALANCE_MAX_TILT_DEG);
-  target.pitch_rad =
-      clampf(-cfg::BALANCE_KP_PITCH * tilt.pitch_rad, -max_tilt, max_tilt);
-  target.roll_rad =
-      clampf(-cfg::BALANCE_KP_ROLL * tilt.roll_rad, -max_tilt, max_tilt);
-  target.yaw_rad = 0.0f;
+  const float tp = clampf(-cfg::BALANCE_KP_PITCH * tilt.pitch_rad, -max_tilt, max_tilt);
+  const float tr = clampf(-cfg::BALANCE_KP_ROLL * tilt.roll_rad, -max_tilt, max_tilt);
+  pose_.pitch_rad = lerp(pose_.pitch_rad, tp, kTiltSmoothing);
+  pose_.roll_rad  = lerp(pose_.roll_rad, tr, kTiltSmoothing);
+  pose_.yaw_rad   = 0.0f;
 
-  // ── Ease the live pose toward the target so corrections are smooth, not twitchy ────
-  pose_.translation.x = lerp(pose_.translation.x, target.translation.x, kSmoothing);
-  pose_.translation.y = lerp(pose_.translation.y, target.translation.y, kSmoothing);
-  pose_.translation.z = lerp(pose_.translation.z, target.translation.z, kSmoothing);
-  pose_.pitch_rad     = lerp(pose_.pitch_rad,     target.pitch_rad,     kSmoothing);
-  pose_.roll_rad      = lerp(pose_.roll_rad,      target.roll_rad,      kSmoothing);
-  pose_.yaw_rad       = lerp(pose_.yaw_rad,       target.yaw_rad,       kSmoothing);
-
-  (void)kEps;
   return pose_;
+}
+
+BodyPose Balance::feedforward_pose() const {
+  // On a slope the COG projects downhill by cog_height·tan(slope); shift the body the other
+  // way (uphill) by the same amount to hold the COG over the support centroid. Pure
+  // feed-forward from the measured slope — no live force needed.
+  BodyPose p;
+  p.translation.x = clampf(-cfg::COG_HEIGHT_MM * std::tan(slope_pitch_) * cfg::WALK_FEEDFORWARD_GAIN,
+                           -cfg::BALANCE_MAX_SHIFT_MM, cfg::BALANCE_MAX_SHIFT_MM);
+  p.translation.z = clampf(-cfg::COG_HEIGHT_MM * std::tan(slope_roll_) * cfg::WALK_FEEDFORWARD_GAIN,
+                           -cfg::BALANCE_MAX_SHIFT_MM, cfg::BALANCE_MAX_SHIFT_MM);
+  p.translation.y = 0.0f;
+  return p;
 }
 
 }  // namespace koda

@@ -23,12 +23,12 @@ void Gait::set_type(GaitType type) {
   }
 }
 
-Vec3 Gait::foot_target(int leg_index, float phase, const Vec2& step, float height) const {
+Vec3 Gait::foot_target(int leg_index, float phase, const Vec2& step, float height,
+                       const Vec3& zero) const {
   // Per-leg phase, wrapped into [0,1).
   float p = phase + timing_.offset[leg_index];
   p -= static_cast<int>(p);            // fractional part (p ≥ 0 always here)
 
-  const Vec3 zero{cfg::ZERO_X, cfg::ZERO_Y, cfg::ZERO_Z};
   const Vec3 half{step.x * 0.5f, 0.0f, step.y * 0.5f};
   const Vec3 over = half * (2.0f * cfg::STEP_CURVE_DELTA);   // = delta * full step
   const Vec3 lift{0.0f, -height, 0.0f};                       // smaller y = foot raised

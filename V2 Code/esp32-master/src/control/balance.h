@@ -24,16 +24,31 @@ namespace koda {
 
 class Balance {
  public:
+  // ── Static path (live force feedback) ──────────────────────────────────────────────
   // forces : per-foot ground reaction force (N), order FL, FR, RR, RL.
   // tilt   : torso tilt from the IMU; pass a level Tilt{} when no IMU is present and the
   //          controller falls back to foot-force re-centring only.
-  BodyPose update(const float* forces, Tilt tilt);
+  // dt     : seconds since the last call (the COG re-centring integrates over time).
+  // Used while STANDING, where the springs give a trustworthy continuous reading.
+  BodyPose update(const float* forces, Tilt tilt, float dt);
+
+  // ── Walking path (feed-forward) ────────────────────────────────────────────────────
+  // The hall sensors are too slow to balance on live force while walking, so WALK biases
+  // the COG from the last STATIC slope measurement instead. set_slope() stores it;
+  // feedforward_pose() returns the COG shift that keeps it over the support centroid.
+  void set_slope(float pitch_rad, float roll_rad) {
+    slope_pitch_ = pitch_rad;
+    slope_roll_ = roll_rad;
+  }
+  BodyPose feedforward_pose() const;
 
   void reset() { pose_ = BodyPose::identity(); }
   const BodyPose& pose() const { return pose_; }
 
  private:
-  BodyPose pose_;   // smoothed, persists between ticks
+  BodyPose pose_;             // smoothed live-feedback pose (static path)
+  float slope_pitch_ = 0.0f;  // last measured slope (feed-forward path)
+  float slope_roll_ = 0.0f;
 };
 
 }  // namespace koda

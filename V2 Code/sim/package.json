@@ -1,0 +1,12 @@
+{
+  "name": "koda-sim",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Off-hardware simulator for the Koda V2 control core (WASM) + reduced-physics world.",
+  "scripts": {
+    "build": "bash wasm/build.sh",
+    "test": "node test/core.test.mjs && node test/world.test.mjs && node test/logger.test.mjs && node test/spring.test.mjs",
+    "trace": "node tools/trace.mjs"
+  }
+}

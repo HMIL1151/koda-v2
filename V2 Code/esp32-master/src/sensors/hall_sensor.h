@@ -12,16 +12,9 @@
 
 #include "config.h"
 #include "sensors/adc.h"
+#include "sensors/hall_model.h"   // HallCal + the pure signal→force maths
 
 namespace koda {
-
-// Per-sensor two-point calibration. s0/s1 are raw ADC counts; K is solved from them.
-struct HallCal {
-  float s0 = 0.0f;          // unloaded signal
-  float s1 = 0.0f;          // fully-compressed signal
-  float K = 1.0f;           // solved magnetic constant
-  bool  calibrated = false;
-};
 
 class HallSensors {
  public:
@@ -46,9 +39,7 @@ class HallSensors {
   const HallCal& cal(int sensor) const { return cal_[sensor]; }
 
  private:
-  float signal_to_distance(float signal, const HallCal& c) const;
-  float distance_to_force(float distance) const;
-  void  update_sensor_force(int sensor);
+  void update_sensor_force(int sensor);
 
   AnalogSource& adc_;
   HallCal cal_[cfg::NUM_HALL_SENSORS];

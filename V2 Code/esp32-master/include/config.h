@@ -115,16 +115,56 @@ constexpr int         HALL_CAL_VERSION = 1;
 constexpr float CONTACT_FORCE_N       = 4.0f;        // force above which a foot is "on the ground"
 constexpr float CONTACT_RELEASE_N     = 2.0f;        // hysteresis: below this = airborne
 constexpr float EARLY_CONTACT_MIN_PHASE = 0.35f;     // only trust early contact past this swing fraction
+// Late contact: a foot that is in stance (should be planted) but feels no load — the ground
+// dropped away. The leg reaches DOWN to find it instead of leaving the body unsupported.
+constexpr float LATE_CONTACT_MIN_STANCE = 0.15f;     // wait this far into stance before flagging
+constexpr float LATE_PROBE_DELAY_S      = 0.08f;     // debounce: probe only on sustained late contact
+constexpr float GROUND_PROBE_SPEED_MM_S = 200.0f;    // how fast the foot reaches down to seek ground
+constexpr float GROUND_PROBE_MAX_MM     = 40.0f;     // cap on extra downward reach (IK is the hard limit)
+
+// Terrain classification from the consistency of early/late contact events while walking
+// (control/terrain_monitor). A consistent directional bias = slope; scattered = uneven.
+constexpr float TERRAIN_EVENT_GAIN   = 0.5f;         // per-event nudge toward ±1 per-leg bias
+constexpr float TERRAIN_DECAY_PER_S  = 0.4f;         // how fast the per-leg bias fades
+constexpr float TERRAIN_FLAT_ENERGY  = 0.10f;        // below this event energy = flat ground
+// Event-based slope detection has a sensitivity floor: gentle slopes (≲10°) produce too few
+// consistent early/late events to clear this. That's inherent to event sensing — finer
+// contact detection (see SPRING_SIZING.md) or an IMU would extend it to shallower slopes.
+constexpr float TERRAIN_SLOPE_BIAS   = 0.18f;        // directional bias magnitude to suspect a slope
+constexpr float TERRAIN_COHERENCE    = 0.55f;        // bias/energy ratio: high = slope, low = uneven
+constexpr float TERRAIN_CONFIRM_S    = 0.6f;         // sustain a SLOPE classification this long to trigger
+
+// Automatic stop→measure→adjust→resume on a detected slope (control/robot MEASURING state).
+constexpr float MEASURE_SETTLE_S     = 0.8f;         // hold the reference stance this long to settle + read
+constexpr float MEASURE_COOLDOWN_S   = 4.0f;         // after a measure, don't auto-trigger again for a while
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Balance / COG management on an incline (control/balance)
 // ─────────────────────────────────────────────────────────────────────────────
-constexpr float BALANCE_KP_PITCH   = 0.6f;           // body pitch correction per rad slope
+constexpr float BALANCE_KP_PITCH   = 0.6f;           // body pitch correction per rad slope (IMU)
 constexpr float BALANCE_KP_ROLL    = 0.6f;
-constexpr float BALANCE_KP_SHIFT   = 0.8f;           // COG shift gain (mm per N of imbalance)
-constexpr float BALANCE_MAX_SHIFT_MM   = 30.0f;      // clamp on COG translation
+// COG re-centring is INTEGRAL: it shifts the body until the front/rear and left/right foot
+// loads equalise, i.e. until the COG sits over the support centroid. A proportional gain
+// can't fully correct a steep slope (the needed shift would demand more imbalance than the
+// robot's weight provides); integrating drives the steady-state imbalance to zero.
+constexpr float BALANCE_KI_SHIFT   = 2.0f;           // mm shift per (N·s) of load imbalance
+constexpr float BALANCE_MAX_SHIFT_MM   = 45.0f;      // clamp on COG translation
 constexpr float BALANCE_MAX_TILT_DEG   = 12.0f;      // clamp on torso pitch/roll correction
 constexpr bool  HAS_IMU            = false;          // set true once an IMU is wired (sensors/imu)
+
+// Slope estimation from the calf springs (static). With the body settled parallel to the
+// ground (symmetric stance, COG NOT yet shifted), the load shifts downhill by the COG's
+// horizontal projection; the force-weighted centre of pressure / COG height gives the slope.
+constexpr float COG_HEIGHT_MM            = 180.0f;   // COG height above the feet (load→angle scale)
+constexpr float SLOPE_MIN_MEASURE_FORCE_N = 10.0f;   // need this much total load to trust a measurement
+constexpr float WALK_FEEDFORWARD_GAIN    = 1.0f;     // 0..1: how much of the measured slope to pre-bias in WALK
+// Gait slope-following: pre-place each foot on the measured ground plane. OFF by default —
+// in this model the body settles PARALLEL to the slope (equal-length legs on tilted ground),
+// so the feet already lie on the plane and pre-tilting them double-tilts, which worsens both
+// the load balance and the early/late event rate (swept in the sim). Re-triggering on a known
+// slope is instead prevented by the post-correction events scattering (→ classed uneven) plus
+// the measure cooldown. Kept settable for hardware that actively holds the body level.
+constexpr float GAIT_SLOPE_FOLLOW        = 0.0f;     // 0 = off, 1 = full plane-follow
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Servo channel order on the wire (must mirror config.py:ServoChannel on the slave)

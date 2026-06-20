@@ -5,16 +5,26 @@ control (PS4 input, kinematics, gait, force feedback, balance) and a **Servo2040
 drives the 12 servos as a calibrated, fail-safe actuator board.
 
 Start with **[ARCHITECTURE.md](ARCHITECTURE.md)** for the design and the V1→V2 mapping,
-**[PROTOCOL.md](PROTOCOL.md)** for the UART contract between the boards, and
-**[CALIBRATION.md](CALIBRATION.md)** for hall-sensor force calibration.
+**[PROTOCOL.md](PROTOCOL.md)** for the UART contract between the boards,
+**[CALIBRATION.md](CALIBRATION.md)** for hall-sensor force calibration,
+**[SPRING_SIZING.md](SPRING_SIZING.md)** for choosing the calf-spring rate/travel, and
+**[sim/README.md](sim/README.md)** to run the control system in a browser/CI without hardware.
 
 ```
 V2 Code/
 ├── ARCHITECTURE.md        design + responsibility split + V1→V2 mapping
 ├── PROTOCOL.md            ESP32 ⇄ Servo2040 UART wire format
 ├── esp32-master/          C++ / Arduino-ESP32 + Bluepad32  (the brain)
-└── servo2040-slave/       MicroPython  (the muscles)
+├── servo2040-slave/       MicroPython  (the muscles)
+└── sim/                   off-hardware simulator — the real control core (WASM) + physics
 ```
+
+## Test it without hardware
+
+The control core compiles to WebAssembly and runs against a reduced-physics world — the
+**same C++ that ships to the ESP32**, no reimplementation. `cd sim && npm run build && npm
+test` for headless regression tests; serve `sim/web/` for an interactive browser sim (walk,
+incline balance, early-contact). See **[sim/README.md](sim/README.md)**.
 
 ## What's new vs V1
 
@@ -27,6 +37,10 @@ V2 Code/
   obstacle) is detected from a force spike and the step is ended early.
 - **Static balance on inclines** — the body shifts its COG over the support polygon and
   matches the torso to the slope using the per-foot forces (and optional IMU).
+- **Automatic slope handling** — static = full spring sensing (measure pitch/roll, centre
+  COG); walking = contact events only (too slow to balance live), with balance fed forward
+  from the last measurement. A consistent early/late-contact pattern flags a slope and the
+  robot **auto-stops, measures it from the springs, adjusts, and resumes** on its own.
 - A real **control loop + state machine** replacing V1's blocking pose sequences, and the
   monolithic `robot.py` broken into small single-purpose modules.
 

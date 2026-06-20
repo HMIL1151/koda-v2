@@ -24,13 +24,16 @@ class GroundContact {
   void update(const float* forces, const float* local_phase, float swing_fraction);
 
   bool in_contact(int leg) const { return in_contact_[leg]; }
-  // True for one detection: foot loaded while still mid-swing. The gait should cut the
-  // swing short for this leg.
+  // Foot loaded while still mid-swing (ground came up early). The gait cuts the swing short.
   bool early_contact(int leg) const { return early_contact_[leg]; }
+  // Foot in stance but unloaded (ground dropped away). The leg should reach down to find it,
+  // otherwise the body loses that support and can tip.
+  bool late_contact(int leg) const { return late_contact_[leg]; }
 
  private:
   bool in_contact_[cfg::NUM_FEET]    = {false, false, false, false};
   bool early_contact_[cfg::NUM_FEET] = {false, false, false, false};
+  bool late_contact_[cfg::NUM_FEET]  = {false, false, false, false};
 };
 
 }  // namespace koda

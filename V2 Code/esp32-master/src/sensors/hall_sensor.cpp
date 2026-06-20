@@ -24,34 +24,10 @@ float HallSensors::read_filtered(int sensor) const {
   return static_cast<float>(total) / cfg::HALL_FILTER_SAMPLES;
 }
 
-// ── Model: signal → spring distance → force (ported from the bench sketch) ──────────
-float HallSensors::signal_to_distance(float signal, const HallCal& c) const {
-  if (!c.calibrated) return cfg::HALL_ZERO_LOAD_DIST_MM;
-
-  // Clamp to the calibrated signal span.
-  const float s_lo = std::fmin(c.s0, c.s1);
-  const float s_hi = std::fmax(c.s0, c.s1);
-  signal = clampf(signal, s_lo, s_hi);
-
-  const float d0 = cfg::HALL_ZERO_LOAD_DIST_MM + cfg::HALL_MAGNET_OFFSET_MM;
-  float inv_d_cubed = (signal - c.s0) / c.K + 1.0f / (d0 * d0 * d0);
-  if (inv_d_cubed <= 0.0f) inv_d_cubed = 1e-9f;     // numerical safety
-
-  const float effective = std::cbrt(1.0f / inv_d_cubed);
-  const float physical = effective - cfg::HALL_MAGNET_OFFSET_MM;
-  return clampf(physical, cfg::HALL_FULL_LOAD_DIST_MM, cfg::HALL_ZERO_LOAD_DIST_MM);
-}
-
-float HallSensors::distance_to_force(float distance) const {
-  const float compression = cfg::HALL_ZERO_LOAD_DIST_MM - distance;
-  const float force = compression * cfg::HALL_SPRING_N_PER_MM;
-  return force < 0.0f ? 0.0f : force;
-}
-
 // ── Per-tick update (round-robin so we never block on all 8 conversions) ────────────
 void HallSensors::update_sensor_force(int sensor) {
   const float raw = static_cast<float>(adc_.read_raw(sensor));
-  const float force = distance_to_force(signal_to_distance(raw, cal_[sensor]));
+  const float force = hall_model::force_from_signal(raw, cal_[sensor]);
   sensor_force_n_[sensor] = primed_
       ? lerp(sensor_force_n_[sensor], force, cfg::HALL_EMA_ALPHA)
       : force;
@@ -83,15 +59,7 @@ void HallSensors::capture_full() {
 }
 
 void HallSensors::solve() {
-  const float d0 = cfg::HALL_ZERO_LOAD_DIST_MM + cfg::HALL_MAGNET_OFFSET_MM;
-  const float d1 = cfg::HALL_FULL_LOAD_DIST_MM + cfg::HALL_MAGNET_OFFSET_MM;
-  const float inv0 = 1.0f / (d0 * d0 * d0);
-  const float inv1 = 1.0f / (d1 * d1 * d1);
-  for (int s = 0; s < cfg::NUM_HALL_SENSORS; ++s) {
-    const float denom = inv1 - inv0;
-    cal_[s].K = (denom != 0.0f) ? (cal_[s].s1 - cal_[s].s0) / denom : 1.0f;
-    cal_[s].calibrated = true;
-  }
+  for (int s = 0; s < cfg::NUM_HALL_SENSORS; ++s) hall_model::solve_k(cal_[s]);
 }
 
 bool HallSensors::all_calibrated() const {

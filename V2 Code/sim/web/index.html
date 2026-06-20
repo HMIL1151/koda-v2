@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Koda V2 — control sim</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; background: #0b0e13; color: #cdd6e2;
+         font: 14px/1.5 ui-sans-serif, system-ui, sans-serif; }
+  header { padding: 10px 16px; border-bottom: 1px solid #1c2330; }
+  header b { color: #e8eef5; }
+  .wrap { display: grid; grid-template-columns: 1fr 360px; gap: 14px; padding: 14px; }
+  canvas { width: 100%; background: #11151c; border: 1px solid #1c2330; border-radius: 8px; display: block; }
+  .views { display: grid; grid-template-rows: 1fr 1fr; gap: 14px; }
+  .panel { background: #11151c; border: 1px solid #1c2330; border-radius: 8px; padding: 14px; }
+  .panel h3 { margin: 0 0 8px; font-size: 13px; color: #e8eef5; }
+  .row { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
+  .row label { width: 90px; color: #8b97a8; }
+  button { background: #1d2735; color: #cdd6e2; border: 1px solid #2a3850;
+           border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+  button:hover { background: #263347; }
+  select, input[type=number] { background: #0d1219; color: #cdd6e2; border: 1px solid #2a3850;
+           border-radius: 6px; padding: 5px; }
+  pre#hud { background: #0d1219; border: 1px solid #1c2330; border-radius: 6px; padding: 10px;
+            white-space: pre-wrap; color: #9fd0ff; min-height: 120px; }
+  kbd { background: #1d2735; border: 1px solid #2a3850; border-radius: 4px; padding: 1px 6px; }
+  .keys { color: #8b97a8; font-size: 12px; }
+  .events-log { margin-top: 8px; max-height: 150px; overflow-y: auto; font: 12px ui-monospace, monospace;
+                color: #9fd0ff; background: #0d1219; border: 1px solid #1c2330; border-radius: 6px; padding: 8px; }
+  .events-log div { white-space: pre; }
+</style>
+</head>
+<body>
+<header>
+  <b>Koda V2 — control simulator</b> · the WASM module is the real ESP32 control core;
+  the physics is a reduced kinematic + spring model.
+</header>
+
+<div class="wrap">
+  <div class="views">
+    <canvas id="side" width="900" height="380"></canvas>
+    <canvas id="top" width="900" height="300"></canvas>
+  </div>
+
+  <div>
+    <div class="panel">
+      <h3>Transport</h3>
+      <div class="row">
+        <button id="play">⏸ Pause</button>
+        <button id="step">⏭ Step</button>
+        <button id="reset">↺ Reset</button>
+      </div>
+      <div class="row">
+        <label>Speed</label>
+        <select id="speed">
+          <option value="1">1× (real time)</option>
+          <option value="0.5">0.5×</option>
+          <option value="0.25">0.25×</option>
+          <option value="0.1">0.1× (slow-mo)</option>
+          <option value="0.05">0.05×</option>
+        </select>
+      </div>
+      <div class="row"><button id="stand">Stand / Sleep</button><button id="gait">Cycle gait</button></div>
+    </div>
+
+    <div class="panel">
+      <h3>Scenario</h3>
+      <div class="row">
+        <label>Terrain</label>
+        <select id="terrain">
+          <option value="flat">flat</option>
+          <option value="slope">slope (incline)</option>
+          <option value="step">step up (early contact)</option>
+          <option value="stepdown">step down (late contact)</option>
+          <option value="bumps">rolling bumps</option>
+        </select>
+      </div>
+      <div class="row"><label>Slope °</label><input id="slope" type="number" value="12" min="-25" max="25" step="1" /></div>
+      <div class="row"><label>Weight N</label><input id="weight" type="number" value="30" min="5" max="120" step="1" /></div>
+      <div class="row"><label>Sim IMU</label><input id="imu" type="checkbox" /> <span class="keys">feed body tilt as IMU (preview)</span></div>
+      <div class="row"><label>Auto slope</label><input id="auto" type="checkbox" checked /> <span class="keys">auto stop→measure→resume on a slope</span></div>
+    </div>
+
+    <div class="panel">
+      <h3>Step geometry</h3>
+      <div class="row"><label>Stance height</label><input id="stanceY" type="number" step="1" /> <span class="keys">mm (leg drop)</span></div>
+      <div class="row"><label>Stance width</label><input id="stanceZ" type="number" step="1" /> <span class="keys">mm (track)</span></div>
+      <div class="row"><label>Step height</label><input id="stepHeight" type="number" step="1" /> <span class="keys">mm (swing lift)</span></div>
+      <div class="row"><label>Step length</label><input id="stepLen" type="number" step="1" /> <span class="keys">mm (stride)</span></div>
+      <div class="keys">Foot colours: green planted · red early contact · orange reaching for ground (late) · magenta out of range (no IK).</div>
+    </div>
+
+    <div class="panel">
+      <h3>Readout</h3>
+      <pre id="hud"></pre>
+    </div>
+
+    <div class="panel">
+      <h3>Spring advisor</h3>
+      <div class="row"><label>Sensor res</label><input id="sensorRes" type="number" value="0.05" step="0.01" min="0.005" /> <span class="keys">mm resolvable (the key unknown)</span></div>
+      <pre id="advisor"></pre>
+    </div>
+
+    <div class="panel">
+      <h3>Logging</h3>
+      <div class="row">
+        <label><input id="record" type="checkbox" checked /> record trace</label>
+        <label><input id="consoleLog" type="checkbox" /> console</label>
+      </div>
+      <div class="row">
+        <button id="dlCsv">⬇ CSV</button>
+        <button id="dlJson">⬇ JSON</button>
+        <button id="clearRec">Clear</button>
+      </div>
+      <div id="events" class="events-log"></div>
+    </div>
+
+    <div class="panel">
+      <h3>Controls</h3>
+      <div class="keys">
+        <kbd>B</kbd> stand/sleep · <kbd>X</kbd> sit · <kbd>G</kbd> gait · <kbd>Space</kbd> play/pause<br />
+        <kbd>W</kbd>/<kbd>S</kbd> fwd/back · <kbd>A</kbd>/<kbd>D</kbd> strafe ·
+        <kbd>Q</kbd>/<kbd>E</kbd> turn · <kbd>R</kbd>/<kbd>F</kbd> height<br />
+        Press <kbd>B</kbd> to stand, then drive. Try terrain = slope or step-up.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="./main.js"></script>
+</body>
+</html>

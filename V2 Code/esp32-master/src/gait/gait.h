@@ -39,9 +39,12 @@ class Gait {
   //               (x = forward/back, z = sideways). Its length is the stride length;
   //               its direction sets travel direction. Built by Robot from the command.
   //   height    : peak swing height (mm)
+  //   zero      : neutral foot position (leg frame) the trajectory is built around — passed
+  //               in (not hard-coded) so the stance geometry is runtime-tunable.
   // Returns the foot position in the leg frame (x, y, z), y measured like V1 (ZERO_Y
   // nominal, smaller y = foot lifted).
-  Vec3 foot_target(int leg_index, float phase, const Vec2& step, float height) const;
+  Vec3 foot_target(int leg_index, float phase, const Vec2& step, float height,
+                   const Vec3& zero) const;
 
  private:
   GaitType   type_;
