@@ -12,13 +12,35 @@
 
 import * as controls from './controls.js';
 import * as render from './render.js';
+import * as view from './view.js';
+import { footIK } from './kinematics.js';
 import { makeOptimiser, OPTIMISER_NAMES } from './optimisers.js';
 
 let problem, optimiser, playing = false, rafId = null;
+let manualFoot = null;          // user-dragged foot target (world mm), or null
 
 function build() {
+    manualFoot = null;          // a fresh search invalidates any held foot pose
     problem = controls.readProblem();
     optimiser = makeOptimiser(controls.getAlgorithm(), problem);
+}
+
+// Foot the dragged target maps to: the cursor if reachable, else the nearest point
+// of the solved workspace cloud (so the leg tracks the reach boundary).
+function solveManual(lengths, points) {
+    if (!manualFoot) return null;
+    let ik = footIK(lengths, manualFoot);
+    if (!ik && points && points.length) ik = footIK(lengths, nearestPoint(points, manualFoot));
+    return ik;
+}
+
+function nearestPoint(points, p) {
+    let best = points[0], bestD = Infinity;
+    for (const q of points) {
+        const d = (q.x - p.x) ** 2 + (q.y - p.y) ** 2;
+        if (d < bestD) { bestD = d; best = q; }
+    }
+    return best;
 }
 
 function draw() {
@@ -27,6 +49,7 @@ function draw() {
     render.renderScene({
         result: best.result,
         lengths,
+        manualLinkage: solveManual(lengths, best.result.points),
         ghosts: optimiser.ghosts(),
         history: optimiser.history,
         status: optimiser.status(),
@@ -46,10 +69,39 @@ function loop() {
 
 function setPlaying(on) {
     playing = on;
+    if (on) manualFoot = null;          // resuming the search drops the held foot pose
     controls.setPlaying(on);
     if (on && rafId === null) rafId = requestAnimationFrame(loop);
     if (!on && rafId !== null) { cancelAnimationFrame(rafId); rafId = null; }
 }
+
+// --- Click-drag the foot --------------------------------------------------------
+// Pointer down/move sets the foot target; draw() solves the linkage by IK. Dragging
+// pauses the search so the auto-fit view stays put while you pose the leg.
+function pointerToWorld(ev) {
+    const c = view.eventToCanvas(ev);
+    return view.toWorld(c.x, c.y);
+}
+
+view.canvas.addEventListener('pointerdown', (ev) => {
+    setPlaying(false);
+    manualFoot = pointerToWorld(ev);
+    view.canvas.setPointerCapture(ev.pointerId);
+    view.canvas.style.cursor = 'grabbing';
+    draw();
+});
+view.canvas.addEventListener('pointermove', (ev) => {
+    if (!view.canvas.hasPointerCapture(ev.pointerId)) return;
+    manualFoot = pointerToWorld(ev);
+    draw();
+});
+const endDrag = (ev) => {
+    if (view.canvas.hasPointerCapture(ev.pointerId)) view.canvas.releasePointerCapture(ev.pointerId);
+    view.canvas.style.cursor = 'grab';
+};
+view.canvas.addEventListener('pointerup', endDrag);
+view.canvas.addEventListener('pointercancel', endDrag);
+view.canvas.style.cursor = 'grab';
 
 controls.initControls({
     onPlayToggle: () => setPlaying(!playing),

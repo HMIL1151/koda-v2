@@ -86,20 +86,23 @@ export function initControls(cb) {
     buildAlgoOptions();
 
     ui = {
-        algo:     document.getElementById('algo'),
-        speed:    document.getElementById('speed'),
-        angleMin: document.getElementById('angleMin'),
-        angleMax: document.getElementById('angleMax'),
-        quality:  document.getElementById('quality'),
-        playBtn:  document.getElementById('playBtn'),
-        stepBtn:  document.getElementById('stepBtn'),
-        resetBtn: document.getElementById('resetBtn'),
-        adoptBtn: document.getElementById('adoptBtn'),
+        algo:       document.getElementById('algo'),
+        speed:      document.getElementById('speed'),
+        angleMin:   document.getElementById('angleMin'),
+        angleMax:   document.getElementById('angleMax'),
+        quality:    document.getElementById('quality'),
+        wHipTorque: document.getElementById('wHipTorque'),
+        wMass:      document.getElementById('wMass'),
+        playBtn:    document.getElementById('playBtn'),
+        stepBtn:    document.getElementById('stepBtn'),
+        resetBtn:   document.getElementById('resetBtn'),
+        adoptBtn:   document.getElementById('adoptBtn'),
     };
 
     ui.algo.addEventListener('change', cb.onAlgoChange);
     ui.quality.addEventListener('change', cb.onParamChange);
-    for (const el of [ui.angleMin, ui.angleMax]) el.addEventListener('input', cb.onParamChange);
+    for (const el of [ui.angleMin, ui.angleMax, ui.wHipTorque, ui.wMass])
+        el.addEventListener('input', cb.onParamChange);
     ui.playBtn.addEventListener('click', cb.onPlayToggle);
     ui.stepBtn.addEventListener('click', cb.onStep);
     ui.resetBtn.addEventListener('click', cb.onReset);
@@ -118,6 +121,8 @@ function readEvalOpts() {
         maxAngle: Math.max(minA, maxA),
         N: QUALITY[ui.quality.value] || 60,
         cellMm: 2,
+        wHipTorque: Math.max(0, num(ui.wHipTorque) || 0),
+        wMass: Math.max(0, num(ui.wMass) || 0),
     };
 }
 

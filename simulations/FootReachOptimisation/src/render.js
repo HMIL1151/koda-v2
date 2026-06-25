@@ -57,15 +57,33 @@ export function renderScene(state) {
             COL.dim, { align: 'right', dx: -4, font: 'bold 10px monospace' });
     }
 
-    // Linkage reaching into the box (representative pose nearest the rect centre).
-    if (result.centrePose) {
+    // Linkage: either the user-dragged pose (inverse kinematics) or the
+    // representative pose nearest the rect centre.
+    const manual = state.manualLinkage;
+    if (manual) {
+        drawLinkage(manual);
+        drawFootHandle(manual.foot, true);
+    } else if (result.centrePose) {
         const fk = footFK(lengths, result.centrePose.aFront, result.centrePose.aRear);
-        if (fk) drawLinkage(fk);
+        if (fk) { drawLinkage(fk); drawFootHandle(fk.foot, false); }
     }
 
     drawSparkline(state.history);
     drawTitle(state);
     fillReadouts(state);
+}
+
+// A ring around the foot to signal it can be grabbed and dragged. Brighter while
+// actively held.
+function drawFootHandle(foot, active) {
+    const P = view.cv(foot);
+    view.ctx.save();
+    view.ctx.strokeStyle = active ? COL.foot : COL.dim;
+    view.ctx.lineWidth = active ? 2 : 1.25;
+    view.ctx.beginPath();
+    view.ctx.arc(P.x, P.y, active ? 11 : 9, 0, Math.PI * 2);
+    view.ctx.stroke();
+    view.ctx.restore();
 }
 
 function drawLinkage(fk) {
@@ -122,6 +140,14 @@ function fillReadouts(state) {
     html += row('Best score', `${result.score.toFixed(0)} mm²`, 'accent');
     html += row('Stride × clearance',
         `${result.stride.toFixed(1)} × ${result.clearance.toFixed(1)} mm`);
+    // When a cost penalty is active, show the raw reach it was discounted from and
+    // attribute the discount to the hip-torque vs calf-mass factors.
+    if (result.penalty > 1.0001) {
+        const cut = (1 - 1 / result.penalty) * 100;
+        html += row('Raw reach', `${result.reach.toFixed(0)} mm²`, 'small');
+        html += row('Cost discount',
+            `−${cut.toFixed(0)}%  ·  hip ×${result.hipPen.toFixed(2)}  calf ×${result.massPen.toFixed(2)}`, 'small');
+    }
     if (state.status) html += row(state.status.label, state.status.value, 'small');
     html += `<h2 style="margin-top:10px">Best dimensions</h2>`;
     for (const d of DIMS) {

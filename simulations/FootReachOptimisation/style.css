@@ -26,7 +26,7 @@ h2 {
 }
 h2 small { text-transform: none; letter-spacing: 0; font-weight: 400; color: #4a5d6e; }
 
-.main { display: flex; gap: 24px; align-items: flex-start; }
+.main { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
 
 .canvas-wrap { position: relative; flex-shrink: 0; }
 
@@ -70,14 +70,17 @@ canvas {
 .speed { display: flex; align-items: center; gap: 6px; font-size: 0.74rem; color: #7f8c8d; }
 .speed input { width: 90px; accent-color: #3498db; }
 
+/* The panel flows its sections into as many ~250px columns as fit, so it stays
+   short instead of one long scroll. Each section is kept whole (never split across
+   a column break). */
 .panel {
-    display: flex;
-    flex-direction: column;
-    gap: 18px;
-    width: 300px;
-    flex-shrink: 0;
+    flex: 1 1 520px;
+    max-width: 720px;
+    min-width: 260px;
+    column-width: 250px;
+    column-gap: 16px;
 }
-section { display: flex; flex-direction: column; gap: 8px; }
+section { display: flex; flex-direction: column; gap: 8px; break-inside: avoid; margin-bottom: 14px; }
 
 /* search rows */
 label.row {
@@ -93,10 +96,10 @@ label.row {
     background: #121226;
     border: 1px solid #1e2d3d;
     border-radius: 7px;
-    padding: 8px 9px;
-    margin-bottom: 8px;
+    padding: 6px 8px;
+    margin-bottom: 6px;
 }
-.varhead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.varhead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
 .varname { font-size: 0.82rem; font-weight: 600; color: #ecf0f1; }
 .locklbl {
     display: flex; align-items: center; gap: 4px;
@@ -125,7 +128,7 @@ label.row {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 7px 10px;
+    padding: 5px 9px;
     background: #141428;
     border-radius: 5px;
     border: 1px solid #1e2d3d;

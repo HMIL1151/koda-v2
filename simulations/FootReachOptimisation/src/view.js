@@ -30,6 +30,19 @@ export function cv(p) {
 }
 export function cvLen(d) { return d * VIEW.scale; }
 
+// Inverse of cv(): canvas pixel -> world mm, using the latest fit() transform.
+export function toWorld(sx, sy) {
+    return { x: VIEW.ox + (sx - VIEW.offX) / VIEW.scale,
+             y: VIEW.oy + (sy - VIEW.offY) / VIEW.scale };
+}
+
+// Pointer event -> canvas pixel coords (handles any CSS scaling of the canvas).
+export function eventToCanvas(ev) {
+    const r = canvas.getBoundingClientRect();
+    return { x: (ev.clientX - r.left) * canvas.width / r.width,
+             y: (ev.clientY - r.top) * canvas.height / r.height };
+}
+
 export function clear() { ctx.clearRect(0, 0, canvas.width, canvas.height); }
 
 export function line(a, b, color, width = 2, dash = []) {

@@ -8,7 +8,7 @@
 <body>
     <div class="app">
         <h1>5-Bar Leg · Foot-Reach Optimiser
-            <small>tune link lengths for the biggest stride × clearance the foot can sweep</small>
+            <small>biggest stride × clearance the foot can sweep, traded off against hip torque &amp; leg mass</small>
         </h1>
 
         <div class="main">
@@ -44,6 +44,14 @@
                     <label class="row">Thigh angle max <input type="number" id="angleMax" class="vin small" value="179" step="1"></label>
                 </section>
 
+                <section>
+                    <h2>Trade-offs <small>(0 = pure reach)</small></h2>
+                    <label class="row" title="Penalise thigh length — long thighs are a bigger lever for the foot reaction at the hip servos.">
+                        Hip-torque weight <input type="number" id="wHipTorque" class="vin small" value="0.5" step="0.1" min="0"></label>
+                    <label class="row" title="Penalise calf length — long calves are the bulk of the leg's mass and swing inertia.">
+                        Calf-mass weight <input type="number" id="wMass" class="vin small" value="0.3" step="0.1" min="0"></label>
+                </section>
+
                 <section class="readouts" id="outputs"></section>
 
                 <section class="legend">
@@ -51,6 +59,7 @@
                     <div><span class="sw box"></span> stride × clearance (the score)</div>
                     <div><span class="sw dot" style="background:#e67e22"></span> calves &nbsp; <span class="sw dot" style="background:#3498db"></span> thighs &nbsp; <span class="sw dot" style="background:#e74c3c"></span> foot</div>
                     <div><span class="sw box ghost"></span> evolutionary population (ghosts)</div>
+                    <div><span class="sw dot" style="background:#e74c3c"></span> drag the foot to pose the solved leg</div>
                 </section>
             </div>
         </div>

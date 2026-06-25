@@ -8,7 +8,7 @@
 //
 // A "lengths" candidate is { thighFront, thighRear, calfFront, calfRear, hipSpacing }.
 
-import { Circle, degToRad } from './helpers.js';
+import { Circle, degToRad, radToDeg } from './helpers.js';
 
 // Knee + foot for a single thigh-angle pair, or null when the calves can't close
 // (that (aFront,aRear) is outside the leg's reachable set).
@@ -29,6 +29,33 @@ export function footFK(L, aFrontDeg, aRearDeg) {
     const foot = inter[0].y > inter[1].y ? inter[0] : inter[1];  // lower (largest y)
     return { kneeF, kneeR, foot,
              hipF: { x: -L.hipSpacing / 2, y: 0 }, hipR: { x: L.hipSpacing / 2, y: 0 } };
+}
+
+// Inverse kinematics: given a desired foot point, solve the linkage that puts the
+// foot there (used by the click-drag interaction). Each knee is found independently
+// as a circle–circle intersection: the front knee lies on circle(hipF, thighFront)
+// AND circle(foot, calfFront); likewise the rear knee. Of the two intersections we
+// take the assembly mode the forward kinematics uses — knees splayed OUTWARD (front
+// knee to the left, rear knee to the right), which keeps the calves converging down
+// onto the foot. Returns the same shape as footFK plus the thigh angles in degrees,
+// or null if the foot is out of reach (the circles don't meet).
+export function footIK(L, foot) {
+    const hipF = { x: -L.hipSpacing / 2, y: 0 }, hipR = { x: L.hipSpacing / 2, y: 0 };
+    const kf = Circle.getCircleIntersection(
+        new Circle(hipF.x, hipF.y, L.thighFront), new Circle(foot.x, foot.y, L.calfFront));
+    const kr = Circle.getCircleIntersection(
+        new Circle(hipR.x, hipR.y, L.thighRear), new Circle(foot.x, foot.y, L.calfRear));
+    if (!kf || !kr) return null;
+
+    const kneeF = kf[0].x <= kf[1].x ? kf[0] : kf[1];   // outermost (left)
+    const kneeR = kr[0].x >= kr[1].x ? kr[0] : kr[1];   // outermost (right)
+
+    // Invert the FK angle relations (see footFK): for the front thigh
+    // kneeF - hipF = thighFront * (-sin aF, cos aF); for the rear, (+sin aR, cos aR).
+    const aF = Math.atan2(-(kneeF.x - hipF.x), kneeF.y - hipF.y);
+    const aR = Math.atan2(kneeR.x - hipR.x, kneeR.y - hipR.y);
+    return { kneeF, kneeR, foot, hipF, hipR,
+             aFront: radToDeg(aF) + 90, aRear: radToDeg(aR) + 90 };
 }
 
 // Sweep both thigh angles over [minAngle, maxAngle] on an N×N grid and collect the
