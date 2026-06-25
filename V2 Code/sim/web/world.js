@@ -6,7 +6,8 @@
 //   1. The control core decides each foot's target (leg frame) from command + foot forces.
 //   2. We place those feet in the world through the current body pose.
 //   3. Feet below the terrain compress a spring → an upward force (this IS the hall-sensor
-//      reading the calf compression). force = compression · springRate.
+//      reading the calf compression). force = penetration · k_foot, where k_foot = kSpring·S
+//      folds in the two-calf 5-bar geometry (the sim's force is the vertical reconstruction).
 //   4. The body relaxes its height / pitch / roll toward force equilibrium (first-order,
 //      stable), and advances forward/lateral/turn in step with the gait phase.
 //   5. Those per-foot forces feed back into the core next tick — closing the loop.
@@ -14,6 +15,7 @@
 // Leg order everywhere: FL, FR, RR, RL.
 
 import { clamp, rotate3, add3, phaseDelta } from './helpers.js';
+import { springSumCos2 } from './calf_geometry.js';
 
 export const RobotState = { SLEEP: 0, STAND: 1, WALK: 2, SIT: 3 };
 export const BTN = { STAND: 1, SIT: 2, GAIT: 4 };
@@ -26,8 +28,26 @@ export class World {
 
     this.weightN = opts.weightN ?? 30;             // robot weight
     this.comHeight = opts.comHeight ?? 60;         // COG height above the hip line (mm)
-    this.springRate = M.HALL_SPRING_N_PER_MM;      // per-foot spring (N/mm)
-    this.maxCompMm = opts.maxCompMm ?? 16;         // spring travel
+
+    // Force model: each foot has TWO calf springs at angle θ from vertical (the leg's 5-bar).
+    // `kSpring` is the one physical spring rate; the per-foot VERTICAL rate is k_foot = kSpring·S,
+    // S = 2cos²θ. θ is the standing calf angle from the IK (24° at the ZERO target — exact for the
+    // symmetric slope-sensing stance; a refinement would read it per-pose live). See ADR 0001.
+    this.kSpring = M.HALL_SPRING_N_PER_MM;          // physical spring rate (N/mm)
+    this.calfAngleDeg = opts.calfAngleDeg ?? 24.0;  // standing calf angle from vertical (from IK)
+    const cosT = Math.cos(this.calfAngleDeg * Math.PI / 180);
+    this.springS = 2 * cosT * cosT;                 // Σcos²θ at the standing pose (fallback)
+    this.kFoot = this.kSpring * this.springS;       // nominal standing per-foot rate; the force
+                                                    // loop uses the LIVE per-pose rate (calf_geometry)
+    this.springTravelMm = opts.springTravelMm ?? 16; // per-spring AXIAL travel to solid
+    // Stiction: a per-spring breakaway force the hall reading can't see below. Modelled as a
+    // dead-band on the SENSED force only (the leg still pushes the body up by the full spring
+    // force — a deliberate simplification; the real friction would also raise body height a
+    // little). With frictionN=0 the sim is unchanged. Demonstrates how friction kills sensing.
+    this.frictionN = opts.frictionN ?? 0;           // per-spring stiction breakaway, N
+    // A vertical penetration δ compresses each spring axially by δ·cosθ, so bottom-out (axial =
+    // travel) happens at vertical penetration travel/cosθ.
+    this.maxCompMm = this.springTravelMm / cosT;    // vertical penetration at bottom-out
     this.halfX = M.LEG_X_SEPARATION_MM / 2;        // hip fore/aft half-span (fixed)
     this.mountX = [this.halfX, this.halfX, -this.halfX, -this.halfX];
 
@@ -39,11 +59,15 @@ export class World {
 
     // Settle gains. First-order relaxation; sized so gain·stiffness stays well under the
     // stability limit (verified by sim/test/world.test.mjs) — fast but non-oscillatory.
+    // The gains multiply the per-foot vertical stiffness k_foot, so divide by S: the tuned
+    // values were set against the old lumped rate (= kSpring), and folding in the 5-bar geometry
+    // raised k_foot by S (≈1.67×). Dividing keeps gain·stiffness — and thus the settle dynamics —
+    // identical, while the steady-state forces (which feed slope sensing) are now physical.
     // The lateral base is narrower than the fore/aft base, so the roll restoring torque is
     // weaker (∝ lever²); scale kRoll up by (halfX/halfZ)² so the body settles parallel to a
     // side slope as readily as pitch does to an incline (still within the stability limit).
-    this.kY = opts.kY ?? 2.0;
-    this.kPitch = opts.kPitch ?? 5e-4;
+    this.kY = (opts.kY ?? 2.0) / this.springS;
+    this.kPitch = (opts.kPitch ?? 5e-4) / this.springS;
     this.kRoll = opts.kRoll ?? this.kPitch * (this.halfX / this.halfZ) ** 2;
 
     // Terrain: world ground height at (x,z). Default flat.
@@ -151,9 +175,15 @@ export class World {
       this.feet[leg] = fw;
       const ground = this.terrain(fw.x, fw.z);
       const penetration = ground - fw.y;           // >0 when the foot is below ground
+      // Live per-pose linkage projection: k_foot = kSpring·Σcos²θ at THIS foot's commanded pose
+      // (the calf angle changes as the foot moves through the gait). Falls back to the standing S
+      // if the target is momentarily unreachable.
+      const sLeg = springSumCos2(this.core.footTarget(leg), this.M, this.springS);
       const comp = clamp(penetration, 0, this.maxCompMm);
-      const force = comp * this.springRate;
-      this.forces[leg] = force;
+      const force = comp * this.kSpring * sLeg;     // vertical foot force = k_foot · penetration
+      // The hall sensor can't see load below the stiction breakaway (both springs) — feed the
+      // core the dead-banded reading, but settle the body on the true spring force.
+      this.forces[leg] = Math.max(0, force - 2 * this.frictionN);
       this.contact[leg] = this.core.inContact(leg);
       this.early[leg] = this.core.earlyContact(leg);
       totalF += force;

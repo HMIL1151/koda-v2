@@ -200,6 +200,8 @@ EMSCRIPTEN_BINDINGS(koda_core) {
   constant("ZERO_Y", (float)cfg::ZERO_Y);
   constant("ZERO_Z", (float)cfg::ZERO_Z);
   constant("LEG_X_SEPARATION_MM", (float)cfg::LEG_X_SEPARATION_MM);
+  constant("HIP_SEPARATION_MM", (float)cfg::HIP_SEPARATION_MM);     // calf_geometry.js (live θ)
+  constant("LEG_GEOMETRY_A_MM", (float)cfg::LEG_GEOMETRY_A_MM);     // calf_geometry.js (live θ)
   constant("SERVO_DISTANCE_MM", (float)cfg::SERVO_DISTANCE_MM);
   constant("THIGH_LENGTH_MM", (float)cfg::THIGH_LENGTH_MM);
   constant("CALF_LENGTH_MM", (float)cfg::CALF_LENGTH_MM);
