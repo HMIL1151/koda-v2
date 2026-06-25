@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Koda V2 — calf-spring advisor</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; background: #0b0e13; color: #cdd6e2;
+         font: 14px/1.5 ui-sans-serif, system-ui, sans-serif; }
+  header { padding: 10px 16px; border-bottom: 1px solid #1c2330; }
+  header b { color: #e8eef5; }
+  header a { color: #9fd0ff; }
+  .wrap { max-width: 1500px; margin: 0 auto; padding: 14px;
+          display: flex; flex-direction: column; gap: 14px; }
+  .top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 360px); gap: 14px; align-items: start; }
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; align-items: start; }
+  .panel { background: #11151c; border: 1px solid #1c2330; border-radius: 8px; padding: 14px; }
+  .panel h3 { margin: 0 0 8px; font-size: 13px; color: #e8eef5; }
+  .row { display: flex; align-items: center; gap: 8px; margin: 7px 0; }
+  .row label { flex: 1; color: #8b97a8; }
+  .row .keys { flex-basis: 100%; }
+  input[type=number] { width: 90px; background: #0d1219; color: #cdd6e2; border: 1px solid #2a3850;
+           border-radius: 6px; padding: 5px; }
+  pre#report { background: #0d1219; border: 1px solid #1c2330; border-radius: 6px;
+            padding: 16px; margin: 0; white-space: pre-wrap; color: #c9d7e6;
+            font: 13.5px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; min-height: 460px; }
+  .report-panel h3 { font-size: 14px; }
+  .keys { color: #8b97a8; font-size: 12px; }
+  .verdict { font-size: 13px; padding: 8px 10px; border-radius: 6px; margin-bottom: 10px; }
+  .verdict.ok { background: #10261a; border: 1px solid #1f5236; color: #8fe6b4; }
+  .verdict.bad { background: #2a1416; border: 1px solid #5a242a; color: #f0a0a8; }
+  /* Rate-window bar */
+  .bar-wrap { position: relative; height: 46px; margin: 16px 0 28px; }
+  .bar-track { position: absolute; top: 18px; left: 0; right: 0; height: 8px; background: #0d1219;
+               border: 1px solid #2a3850; border-radius: 4px; }
+  .bar-window { position: absolute; top: 18px; height: 8px; background: #1f5236; border-radius: 4px; }
+  .bar-mark { position: absolute; top: 8px; width: 2px; height: 28px; }
+  .bar-mark span { position: absolute; top: -14px; left: 50%; transform: translateX(-50%);
+                   white-space: nowrap; font-size: 10px; }
+  .bar-axis { position: absolute; bottom: -2px; font-size: 10px; color: #6b7686; }
+</style>
+</head>
+<body>
+<header>
+  <b>Koda V2 — calf-spring advisor</b> · sizes the physical spring rate <code>kSpring</code> and travel
+  · maths shared with <code>tools/spring_sizing.mjs</code> · <a href="index.html">← back to the sim</a>
+</header>
+
+<div class="wrap">
+  <div class="top">
+  <div class="controls" id="controls">
+    <div class="panel">
+      <h3>Robot &amp; geometry</h3>
+      <div class="row"><label>Mass</label><input id="mass" type="number" value="3.0" step="0.1" /><span class="keys">kg</span></div>
+      <div class="row"><label>COG height</label><input id="cogHeight" type="number" value="180" step="5" /><span class="keys">mm above feet</span></div>
+      <div class="row"><label>Foot separation</label><input id="footSeparation" type="number" value="221" step="1" /><span class="keys">mm fore/aft (L)</span></div>
+      <div class="row"><label>Calf angle</label><input id="calfAngleDeg" type="number" value="24.0" step="0.5" /><span class="keys">° from vertical (IK)</span></div>
+      <div class="row"><label>Feet down</label><input id="feet" type="number" value="4" step="1" /><span class="keys">while slope sensing</span></div>
+    </div>
+
+    <div class="panel">
+      <h3>Slope sensing (→ k_max, soft)</h3>
+      <div class="row"><label>Min slope</label><input id="slopeMinDeg" type="number" value="3" step="0.5" /><span class="keys">° to resolve</span></div>
+      <div class="row"><label>Max slope</label><input id="slopeMaxDeg" type="number" value="20" step="1" /><span class="keys">° (travel swing)</span></div>
+      <div class="row"><label>SNR</label><input id="snr" type="number" value="3" step="0.5" /><span class="keys">× over noise floor</span></div>
+    </div>
+
+    <div class="panel">
+      <h3>Contact detection (→ k_min, stiff)</h3>
+      <div class="row"><label>Contact force</label><input id="contactForceN" type="number" value="4" step="0.5" /><span class="keys">N (CONTACT_FORCE_N)</span></div>
+      <div class="row"><label>Descent speed</label><input id="descentSpeedMmS" type="number" value="150" step="10" /><span class="keys">mm/s at landing</span></div>
+      <div class="row"><label>Detect ticks</label><input id="detectTicks" type="number" value="2" step="1" /><span class="keys">ticks allowed</span></div>
+      <div class="row"><label>Control dt</label><input id="dtS" type="number" value="0.02" step="0.005" /><span class="keys">s (50 Hz)</span></div>
+    </div>
+
+    <div class="panel">
+      <h3>Sensor (signal = a/(d+b)³ + c)</h3>
+      <div class="row"><label>ADC noise</label><input id="adcNoiseCounts" type="number" value="3" step="1" /><span class="keys">counts — MEASURE on bench ***</span></div>
+      <div class="row"><label>Cal a</label><input id="calA" type="number" value="6600000" step="100000" /><span class="keys">counts·mm³ (fit)</span></div>
+      <div class="row"><label>Cal b</label><input id="calB" type="number" value="5.0" step="0.5" /><span class="keys">mm magnetic offset</span></div>
+    </div>
+
+    <div class="panel">
+      <h3>Spring &amp; travel</h3>
+      <div class="row"><label>Travel</label><input id="springTravelMm" type="number" value="16" step="0.5" /><span class="keys">mm per-spring axial</span></div>
+      <div class="row"><label>Free length d</label><input id="zeroLoadDistMm" type="number" value="17.0" step="0.5" /><span class="keys">mm unloaded</span></div>
+      <div class="row"><label>Solid length d</label><input id="fullLoadDistMm" type="number" value="1.0" step="0.5" /><span class="keys">mm full compression</span></div>
+      <div class="row"><label>Preload</label><input id="preloadMm" type="number" value="1.0" step="0.5" /><span class="keys">mm install pre-compression</span></div>
+      <div class="row"><label>Friction</label><input id="frictionN" type="number" value="0" step="0.5" /><span class="keys">N stiction — raise to match bench</span></div>
+      <div class="row"><label>Candidate k</label><input id="candidateKSpring" type="number" value="1.79" step="0.1" /><span class="keys">N/mm — check against window</span></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3>Verdict</h3>
+    <div id="verdict" class="verdict"></div>
+    <div class="bar-wrap" id="barWrap">
+      <div class="bar-track"></div>
+      <div class="bar-window" id="barWindow"></div>
+      <div class="bar-axis" style="left:0">0.1</div>
+      <div class="bar-axis" style="right:0">20</div>
+    </div>
+    <div class="keys">Window bar (log scale, N/mm): green = usable range, ★ = recommended, line = your candidate.</div>
+  </div>
+  </div><!-- /.top -->
+
+  <div class="panel report-panel">
+    <h3>Report</h3>
+    <pre id="report"></pre>
+  </div>
+</div>
+
+<script type="module">
+import { report, springWindow } from './spring_sizing.js';
+
+const ids = ['mass','cogHeight','footSeparation','calfAngleDeg','feet','slopeMinDeg','slopeMaxDeg','snr',
+  'contactForceN','descentSpeedMmS','detectTicks','dtS','adcNoiseCounts','calA','calB',
+  'springTravelMm','zeroLoadDistMm','fullLoadDistMm','preloadMm','frictionN','candidateKSpring'];
+const $ = (id) => document.getElementById(id);
+const num = (id) => parseFloat($(id).value);
+
+// Log-scale position (0.1–20 N/mm) for the rate-window bar.
+const LO = 0.1, HI = 20;
+const pos = (k) => {
+  const t = (Math.log(Math.min(Math.max(k, LO), HI)) - Math.log(LO)) / (Math.log(HI) - Math.log(LO));
+  return (t * 100).toFixed(1) + '%';
+};
+
+function mark(left, color, label) {
+  const m = document.createElement('div');
+  m.className = 'bar-mark';
+  m.style.left = left; m.style.background = color;
+  m.innerHTML = `<span style="color:${color}">${label}</span>`;
+  return m;
+}
+
+function update() {
+  const p = {};
+  for (const id of ids) p[id] = num(id);
+  p.kSpring = p.candidateKSpring;   // evaluate VISIBLE standing compression at the actual spring
+  const r = springWindow(p);
+  $('report').textContent = report(p);
+
+  // Verdict + candidate check.
+  const k = p.candidateKSpring;
+  const inWin = r.feasible && k >= r.kSpringMin && k <= r.kSpringMax;
+  const v = $('verdict');
+  if (!r.feasible) {
+    v.className = 'verdict bad';
+    v.textContent = 'NO WINDOW — the sensor/preload can\'t do both jobs. See the report.';
+  } else if (!r.travelOk) {
+    v.className = 'verdict bad';
+    v.textContent = `Window ${r.kSpringMin.toFixed(2)}–${r.kSpringMax.toFixed(2)} N/mm, but the recommended spring needs ${r.travelNeeded.toFixed(1)} mm travel (> ${p.springTravelMm} mm).`;
+  } else if (!r.deadbandOk) {
+    v.className = 'verdict bad';
+    v.textContent = `Preload too high — standing load is inside the ${r.deadbandN.toFixed(1)} N dead-band, so slope sensing reads nothing.`;
+  } else {
+    v.className = 'verdict ok';
+    v.textContent = `Recommended kSpring ${r.kSpringRec.toFixed(2)} N/mm (window ${r.kSpringMin.toFixed(2)}–${r.kSpringMax.toFixed(2)}). Candidate ${k.toFixed(2)} is ${inWin ? 'INSIDE ✓' : 'OUTSIDE ✗'}.`;
+  }
+
+  // Rate-window bar.
+  const win = $('barWindow');
+  for (const old of $('barWrap').querySelectorAll('.bar-mark')) old.remove();
+  if (r.feasible) {
+    const l = Math.min(Math.max(r.kSpringMin, LO), HI), h = Math.min(Math.max(r.kSpringMax, LO), HI);
+    const lp = (Math.log(l) - Math.log(LO)) / (Math.log(HI) - Math.log(LO));
+    const hp = (Math.log(h) - Math.log(LO)) / (Math.log(HI) - Math.log(LO));
+    win.style.left = (lp * 100) + '%';
+    win.style.width = ((hp - lp) * 100) + '%';
+    win.style.display = 'block';
+    $('barWrap').appendChild(mark(pos(r.kSpringMin), '#5a7', 'k_min'));
+    $('barWrap').appendChild(mark(pos(r.kSpringMax), '#5a7', 'k_max'));
+    $('barWrap').appendChild(mark(pos(r.kSpringRec), '#9fd0ff', '★ rec'));
+  } else {
+    win.style.display = 'none';
+  }
+  $('barWrap').appendChild(mark(pos(k), inWin ? '#9fe6b4' : '#f0a0a8', `candidate ${k}`));
+}
+
+for (const id of ids) $(id).addEventListener('input', update);
+update();
+</script>
+</body>
+</html>

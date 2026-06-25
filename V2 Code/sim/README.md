@@ -222,7 +222,12 @@ The control philosophy split: **static = full spring sensing, walking = contact 
 The **Spring advisor** panel runs the [spring-sizing maths](../SPRING_SIZING.md) live on the
 current settings: it derives the usable spring-rate window (soft enough to resolve slopes,
 stiff enough to detect contact), recommends a rate + travel, and flags when the current
-modelled spring sits inside it. The same maths is a CLI: `node tools/spring_sizing.mjs`.
+modelled spring sits inside it.
+
+For the full tool with every input exposed (sensor calibration, ADC noise, preload, travel,
+slope range…) plus a rate-window bar and derived-quantity readout, open the dedicated
+**[web/spring.html](web/spring.html)** page — it's pure JS (no WASM needed). The same maths is
+also a CLI: `node tools/spring_sizing.mjs`.
 
 ## How it stays a single source of truth
 

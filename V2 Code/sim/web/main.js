@@ -6,7 +6,7 @@ import KodaCore from './koda-core.mjs';
 import { World, BTN } from './world.js';
 import { drawSide, drawTop, readout } from './render.js';
 import { Recorder, diffEvents } from './logger.js';
-import { report, springWindow } from './spring_sizing.js';
+import { report } from './spring_sizing.js';
 
 const M = await KodaCore();
 
@@ -150,6 +150,7 @@ function rebuildWorld() {
     terrain: makeTerrain(),
     weightN: parseFloat($('weight').value) || 30,
     useImu: $('imu').checked,
+    frictionN: parseFloat($('frictionN').value) || 0,   // per-spring stiction (degrades sensing)
   });
   world.core.setAutoSlope($('auto').checked);
   applyGaitInputs();          // keep the tuned step geometry across a reset
@@ -164,16 +165,17 @@ function updateAdvisor() {
     mass: world.weightN / 9.81,
     cogHeight: g.stanceY + world.comHeight,        // COG above the feet
     footSeparation: M.LEG_X_SEPARATION_MM,
-    sensorResolutionMm: parseFloat($('sensorRes').value) || 0.05,
+    calfAngleDeg: world.calfAngleDeg,              // standing calf angle from the IK
     contactForceN: 4,                              // config CONTACT_FORCE_N
     descentSpeedMmS: g.stepHeight * 4,             // ~ step height × cadence
-    springTravelMm: world.maxCompMm,
+    springTravelMm: world.springTravelMm,          // per-spring axial travel
+    preloadMm: 1.0,                                 // sensor/preload defaults — tune them on spring.html
+    adcNoiseCounts: 3,
+    frictionN: world.frictionN,                     // live from the sim's friction knob
+    kSpring: world.kSpring,                          // VISIBLE standing compression at the modelled spring
   };
-  const r = springWindow(params);
-  const kNow = world.springRate;
-  const inWindow = r.feasible && kNow >= r.kMin && kNow <= r.kMax;
-  $('advisor').textContent = report(params) +
-    `\ncurrent spring: ${kNow.toFixed(2)} N/mm — ${r.feasible ? (inWindow ? 'inside the window ✓' : 'OUTSIDE the window ✗') : 'no window'}`;
+  // report() includes the "your spring INSIDE/OUTSIDE the window" verdict (params.kSpring).
+  $('advisor').textContent = report(params);
 }
 
 // ── Wire controls ─────────────────────────────────────────────────────────────────────
@@ -188,7 +190,8 @@ $('clearRec').addEventListener('click', () => { rec.clear(); eventsEl.innerHTML 
 for (const id of ['terrain', 'slope', 'weight', 'imu']) $(id).addEventListener('change', rebuildWorld);
 $('auto').addEventListener('change', () => world.core.setAutoSlope($('auto').checked));
 for (const id of Object.values(GAIT_INPUTS)) $(id).addEventListener('input', () => { applyGaitInputs(); updateAdvisor(); });
-for (const id of ['sensorRes', 'weight']) $(id).addEventListener('input', updateAdvisor);
+$('weight').addEventListener('input', updateAdvisor);
+$('frictionN').addEventListener('input', () => { rebuildWorld(); updateAdvisor(); });
 
 initGaitInputs();
 updateAdvisor();
