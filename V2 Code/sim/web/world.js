@@ -143,20 +143,38 @@ export class World {
     // proper gait start never drags a planted foot.
     const local = [0, 1, 2, 3].map((l) => this.footLocal(l));
     if (this.prevLocal) {
-      let dx = 0, dz = 0, n = 0;
+      // The body advances AND yaws this tick; both must keep the stance feet planted. A
+      // planted foot's world x/z is body + R(yaw)·footLocal, so we move the body to hold each
+      // stance foot's full world position fixed across the tick — using the OLD yaw for the
+      // previous foot pose and the NEW yaw for this one. (Compensating only the gait slide while
+      // letting yaw rotate the feet about the body origin is what dragged the planted feet and
+      // sent the body haywire on a turn.) With yaw unchanged this reduces to the pure slide.
+      //
+      // Turn rate tracks gait progress (|phaseDelta|), so the body only yaws as the feet step.
+      // Clamp the per-tick step, though: a phase DISCONTINUITY — gait start (phase 0→~0.28 on the
+      // first moving tick) or any stall-induced jump — would otherwise snap the body around in one
+      // tick and skate the planted feet. Steady turning is ~0.012 rad/tick, well under this cap.
+      const MAX_YAW_STEP = 0.03;                     // rad/tick (~86°/s at 50 Hz) — onset guard
+      const yawOld = this.body.yaw;
+      const yawStep = clamp((command.yaw ?? 0) * 0.4 *
+        Math.abs(phaseDelta(this.core.cyclePhase(), this.prevPhase)), -MAX_YAW_STEP, MAX_YAW_STEP);
+      const yawNew = yawOld + yawStep;
+      const cO = Math.cos(yawOld), sO = Math.sin(yawOld);
+      const cN = Math.cos(yawNew), sN = Math.sin(yawNew);
+      let bx = 0, bz = 0, n = 0;
       for (let l = 0; l < 4; l++) {
         if (this.contact[l]) {                       // previous tick's contact state
-          dx += local[l].x - this.prevLocal[l].x;
-          dz += local[l].z - this.prevLocal[l].z;
+          const p = this.prevLocal[l], q = local[l];
+          // R(yaw)·(x,z) per rotate3's yaw convention: (x·cos + z·sin, −x·sin + z·cos).
+          bx += (p.x * cO + p.z * sO) - (q.x * cN + q.z * sN);
+          bz += (-p.x * sO + p.z * cO) - (-q.x * sN + q.z * cN);
           n++;
         }
       }
       if (n > 0) {
-        dx /= n; dz /= n;
-        this.body.yaw += (command.yaw ?? 0) * 0.4 * Math.abs(phaseDelta(this.core.cyclePhase(), this.prevPhase));
-        const c = Math.cos(this.body.yaw), s = Math.sin(this.body.yaw);
-        this.body.x -= dx * c + dz * s;              // move body to keep the stance feet planted
-        this.body.z -= -dx * s + dz * c;
+        this.body.x += bx / n;                       // move body to keep the stance feet planted
+        this.body.z += bz / n;
+        this.body.yaw = yawNew;
       }
     }
     this.prevLocal = local;
@@ -169,6 +187,12 @@ export class World {
 
     // 2 & 3. Place feet, compute contact spring forces. Torques are taken about the COG, so
     // equilibrium = the gravity line through the COG passing through the support centroid.
+    // The lever arms are resolved in the body's HEADING frame (yaw removed): pitch is a tilt
+    // about the body's lateral axis and roll about its fore/aft axis, so the levers that drive
+    // them must be the fore/aft and lateral components in the body frame — not world x/z. With
+    // yaw = 0 this is identity; once the robot has turned, using world levers would feed the
+    // wrong tilt axis and the settle loop diverges (the haywire-on-turn bug).
+    const cy = Math.cos(this.body.yaw), sy = Math.sin(this.body.yaw);
     let totalF = 0, torquePitch = 0, torqueRoll = 0;
     for (let leg = 0; leg < 4; leg++) {
       const fw = this.footWorld(leg);
@@ -187,8 +211,13 @@ export class World {
       this.contact[leg] = this.core.inContact(leg);
       this.early[leg] = this.core.earlyContact(leg);
       totalF += force;
-      torquePitch += force * (fw.x - this.cog.x);
-      torqueRoll += force * (fw.z - this.cog.z);
+      // World lever (fw − cog) rotated by −yaw into the body heading frame (inverse of the yaw
+      // in helpers.rotate3): fore/aft → pitch, lateral → roll.
+      const dx = fw.x - this.cog.x, dz = fw.z - this.cog.z;
+      const leverX = dx * cy - dz * sy;            // fore/aft in the body frame → pitch
+      const leverZ = dx * sy + dz * cy;            // lateral in the body frame → roll
+      torquePitch += force * leverX;
+      torqueRoll += force * leverZ;
     }
 
     // 4. Quasi-static settle: relax body height + tilt toward force equilibrium.

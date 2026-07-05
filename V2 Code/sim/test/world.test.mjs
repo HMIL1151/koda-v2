@@ -207,5 +207,58 @@ console.log('Late ground contact on a step-down:');
   ok(s.contact.filter(Boolean).length >= 2, 'regains solid support on the lower ground');
 }
 
+// ── Turning in place doesn't drag planted feet or blow up the body ───────────────────
+console.log('Turn-in-place stability:');
+{
+  const w = new World(M);
+  w.step({ buttons: BTN.STAND }, 0.02);
+  run(w, {}, 80);
+
+  // Straight-walk references: steady planted-foot drag and peak total foot force. Gait force
+  // naturally peaks above the static weight during the double-support overlap, so the turn is
+  // judged against straight walking — not against a fixed fraction of the weight.
+  const walkProbe = (cmd, n) => {
+    let prevF = w.state().feet.map((p) => ({ ...p }));
+    let prevC = w.state().contact.slice();
+    let drag = 0, peakForce = 0;
+    for (let i = 0; i < n; i++) {
+      w.step(cmd, 0.02);
+      const st = w.state();
+      for (let l = 0; l < 4; l++) {
+        if (prevC[l] && st.contact[l]) drag = Math.max(drag, Math.hypot(st.feet[l].x - prevF[l].x, st.feet[l].z - prevF[l].z));
+      }
+      peakForce = Math.max(peakForce, st.totalForce);
+      prevF = st.feet.map((p) => ({ ...p }));
+      prevC = st.contact.slice();
+    }
+    return { drag, peakForce };
+  };
+  const { drag: steadyDrag, peakForce: walkForce } = walkProbe({ vx: 0.9 }, 200);
+
+  // Now turn in place (gait running, yaw held) and watch for divergence.
+  w.step({ buttons: BTN.GAIT }, 0.02);
+  let prevF = w.state().feet.map((p) => ({ ...p }));
+  let prevC = w.state().contact.slice();
+  let turnDrag = 0, maxTilt = 0, maxForce = 0, finite = true;
+  for (let i = 0; i < 200; i++) {
+    w.step({ yaw: 1 }, 0.02);
+    const st = w.state();
+    for (let l = 0; l < 4; l++) {
+      if (prevC[l] && st.contact[l]) turnDrag = Math.max(turnDrag, Math.hypot(st.feet[l].x - prevF[l].x, st.feet[l].z - prevF[l].z));
+    }
+    maxTilt = Math.max(maxTilt, Math.abs(st.body.pitch), Math.abs(st.body.roll));
+    maxForce = Math.max(maxForce, st.totalForce);
+    if (!Number.isFinite(st.body.y)) finite = false;
+    prevF = st.feet.map((p) => ({ ...p }));
+    prevC = st.contact.slice();
+  }
+  const s = w.state();
+  ok(Math.abs(s.body.yaw) > 1.0, 'the robot actually turns (body yaw accumulates)');
+  ok(turnDrag <= steadyDrag * 3, `turning doesn't drag planted feet (turn ${turnDrag.toFixed(1)} ≤ 3× steady ${steadyDrag.toFixed(1)}mm/tick)`);
+  ok(maxTilt < 0.3, `body stays level while turning (max tilt ${maxTilt.toFixed(2)} rad, well under the 0.5 clamp)`);
+  ok(finite && Math.abs(s.body.y - w.gaitParams.stanceY) < 25, 'body height stays near stance height (no ballooning)');
+  ok(maxForce <= walkForce * 1.2, `foot force stays sane while turning (turn ${maxForce.toFixed(0)}N ≤ 1.2× straight-walk peak ${walkForce.toFixed(0)}N)`);
+}
+
 console.log(failures === 0 ? '\nALL WORLD TESTS PASSED' : `\n${failures} TEST(S) FAILED`);
 process.exit(failures === 0 ? 0 : 1);
