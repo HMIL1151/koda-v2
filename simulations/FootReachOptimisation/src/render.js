@@ -58,19 +58,22 @@ export function renderScene(state) {
     }
 
     // Linkage: either the user-dragged pose (inverse kinematics) or the
-    // representative pose nearest the rect centre.
+    // representative pose nearest the rect centre. Keep the foot that's actually
+    // on screen so the readouts can report its coordinates.
     const manual = state.manualLinkage;
+    let shownFoot = null;
     if (manual) {
         drawLinkage(manual);
         drawFootHandle(manual.foot, true);
+        shownFoot = manual.foot;
     } else if (result.centrePose) {
         const fk = footFK(lengths, result.centrePose.aFront, result.centrePose.aRear);
-        if (fk) { drawLinkage(fk); drawFootHandle(fk.foot, false); }
+        if (fk) { drawLinkage(fk); drawFootHandle(fk.foot, false); shownFoot = fk.foot; }
     }
 
     drawSparkline(state.history);
     drawTitle(state);
-    fillReadouts(state);
+    fillReadouts(state, shownFoot);
 }
 
 // A ring around the foot to signal it can be grabbed and dragged. Brighter while
@@ -132,12 +135,18 @@ function row(label, value, cls = '') {
     return `<div class="readout ${cls}"><span class="lbl">${label}</span><span class="val">${value}</span></div>`;
 }
 
-function fillReadouts(state) {
+function fillReadouts(state, shownFoot) {
     const { result, lengths, problem } = state;
     const out = document.getElementById('outputs');
     const locked = (key) => !problem.names.includes(key);
     let html = '';
     html += row('Best score', `${result.score.toFixed(0)} mm²`, 'accent');
+    // Current foot position, in the linkage frame: x from the torso centre (midpoint
+    // of the two hips), y positive DOWN from the hip line. Drag the foot to update.
+    if (shownFoot) {
+        html += row('Foot x / y',
+            `${shownFoot.x.toFixed(1)} / ${shownFoot.y.toFixed(1)} mm`, 'accent');
+    }
     html += row('Stride × clearance',
         `${result.stride.toFixed(1)} × ${result.clearance.toFixed(1)} mm`);
     // When a cost penalty is active, show the raw reach it was discounted from and
