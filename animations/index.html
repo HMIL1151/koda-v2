@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AM Process Animations — FDM / SLA / SLS / MJF</title>
+  <style>
+    :root {
+      --bg: #0e1116;
+      --panel: #161b22;
+      --panel-2: #1d232c;
+      --line: #2a323d;
+      --text: #d7dee8;
+      --muted: #8b97a7;
+      --accent: #4c9aff;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    #app { display: grid; grid-template-columns: 1fr 340px; height: 100vh; }
+    #stage { position: relative; overflow: hidden; background: radial-gradient(120% 120% at 50% 0%, #12161d 0%, #0b0e13 70%); }
+    #stage canvas { display: block; width: 100%; height: 100%; }
+    #panel { background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; padding: 14px 14px 40px; }
+    #panel h1 { font-size: 14px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin: 4px 0 14px; }
+    .tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 16px; }
+    .tab { padding: 9px 0; text-align: center; font-size: 12px; font-weight: 600; border: 1px solid var(--line);
+      border-radius: 8px; background: var(--panel-2); color: var(--muted); cursor: pointer; user-select: none; }
+    .tab.active { color: #fff; border-color: var(--accent); background: #1b2735; }
+    .group { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; background: var(--panel-2); }
+    .group > .gt { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 8px; }
+    .row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; margin: 8px 0; }
+    .row label { font-size: 12px; color: var(--text); }
+    .row .val { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 46px; text-align: right; }
+    input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); }
+    input[type=color] { width: 34px; height: 22px; padding: 0; border: 1px solid var(--line); border-radius: 5px; background: none; }
+    select, input[type=number] { background: #0e131a; color: var(--text); border: 1px solid var(--line);
+      border-radius: 6px; padding: 5px 6px; font-size: 12px; width: 100%; }
+    .toggle { display: flex; align-items: center; gap: 8px; }
+    .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px; }
+    button { background: #223043; color: #fff; border: 1px solid var(--line); border-radius: 8px;
+      padding: 9px; font-size: 12px; font-weight: 600; cursor: pointer; }
+    button.primary { background: var(--accent); border-color: var(--accent); }
+    button:active { transform: translateY(1px); }
+    .scrub { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+    .scrub input[type=range] { grid-column: auto; }
+    .hint { font-size: 11px; color: var(--muted); line-height: 1.5; margin-top: 6px; }
+    .cmd { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10.5px; color: #a8b6c7;
+      background: #0b0f14; border: 1px solid var(--line); border-radius: 6px; padding: 8px; margin-top: 6px;
+      white-space: pre-wrap; word-break: break-all; user-select: all; }
+    #overlay { position: absolute; inset: 0; pointer-events: none; }
+    .badge { position: absolute; left: 18px; top: 16px; font-size: 12px; color: var(--muted);
+      font-variant-numeric: tabular-nums; background: rgba(10,14,20,.6); padding: 5px 9px; border-radius: 6px; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="stage">
+      <canvas id="c"></canvas>
+      <div id="overlay"><div class="badge" id="badge"></div></div>
+    </div>
+    <div id="panel">
+      <h1>AM Process Animations</h1>
+      <div class="tabs" id="tabs"></div>
+      <div id="controls"></div>
+    </div>
+  </div>
+
+  <script type="importmap">
+    { "imports": { "three": "./vendor/three.module.js" } }
+  </script>
+  <script type="module" src="./src/app.js"></script>
+</body>
+</html>

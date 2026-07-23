@@ -1,0 +1,15 @@
+{
+  "name": "am-process-animations",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Stylized isometric additive-manufacturing process animations (FDM, SLA, SLS, MJF) with 4K/60fps headless frame export.",
+  "scripts": {
+    "serve": "node serve.mjs",
+    "render": "node render.mjs"
+  },
+  "dependencies": {
+    "archiver": "^7.0.1",
+    "puppeteer": "^23.0.0"
+  }
+}
