@@ -13,46 +13,34 @@ from pimoroni import Analog, AnalogMux
 from servo import servo2040
 
 
-# Set up the shared analog input and multiplexer
-sen_adc = Analog(servo2040.SHARED_ADC)
-mux = AnalogMux(servo2040.ADC_ADDR_0, servo2040.ADC_ADDR_1, servo2040.ADC_ADDR_2,
-                muxed_pin=Pin(servo2040.SHARED_ADC))
-
-# Configure sensor 1 with pull-down for the potentiometer
-mux.configure_pull(servo2040.SENSOR_1_ADDR, Pin.PULL_DOWN)
-
-walk_directions = [Direction.FORWARDS, Direction.BACKWARDS]
-turn_directions = [Direction.CLOCKWISE, Direction.COUNTERCLOCKWISE]
-
 koda = Robot()
 # koda.wake()
 # time.sleep(2)
-koda.rotation_test(50)
 
-time.sleep(1)
+
+# while True:
+#     koda.zero_robot()
+
+count = 0
+while count < 10:
+    walk_dir = Direction.FORWARDS
+    walk_steps = random.randint(10, 10)
+    
+    turn_dir = Direction.BACKWARDS
+    turn_steps = random.randint(10, 10)
+
+    print(f"Walking {walk_dir} for {walk_steps} steps")
+    koda.go_for_steps(walk_steps, walk_dir)
+    time.sleep(0.5)
+    
+    print(f"Turning {turn_dir} for {turn_steps} steps")
+    koda.go_for_steps(turn_steps, turn_dir)
+    time.sleep(0.5)
+
+    count = count + 1
+    print()
 
 koda.sleep()
-
-# count = 0
-# while count < 10:
-#     walk_dir = walk_directions[random.randint(0, 1)]
-#     walk_steps = random.randint(10, 20)
-    
-#     turn_dir = turn_directions[random.randint(0, 1)]
-#     turn_steps = random.randint(5, 10)
-
-#     print(f"Walking {walk_dir} for {walk_steps} steps")
-#     koda.go_for_steps(walk_steps, walk_dir)
-#     time.sleep(0.5)
-    
-#     print(f"Turning {turn_dir} for {turn_steps} steps")
-#     koda.go_for_steps(turn_steps, turn_dir)
-#     time.sleep(0.5)
-
-#     count = count + 1
-#     print()
-
-# koda.sleep()
 
 
 

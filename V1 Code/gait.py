@@ -12,7 +12,7 @@ class Gait:
 
     
     
-    STEP_HEIGHT = 40 
+    STEP_HEIGHT = 42
     STEP_CURVE_DELTA = 0.2
     MANOUVRE_STEP_DISTANCE = 15
     MANOUVRE_SPEED = 50
